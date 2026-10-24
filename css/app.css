@@ -1045,6 +1045,26 @@ body {
   flex-wrap: wrap;
 }
 
+/* 翻译设置的引导说明（第一次从中文切到英文时显示） */
+.translate-intro {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #3730a3;
+}
+
+.translate-intro p {
+  margin: 0 0 6px;
+}
+
+.translate-intro p:last-child {
+  margin-bottom: 0;
+}
+
 /* 弹窗里每条设置之间的间距 */
 .sheet-body .field {
   margin-bottom: 12px;

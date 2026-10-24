@@ -71,6 +71,8 @@
     apiKeyInput: document.getElementById('apiKeyInput'),
     btnTestApi: document.getElementById('btnTestApi'),
     testResult: document.getElementById('testResult'),
+    translateIntro: document.getElementById('translateIntro'),
+    btnTranslateSave: document.getElementById('btnTranslateSave'),
     exportDialog: document.getElementById('exportDialog'),
     exportZh: document.getElementById('exportZh'),
     exportEn: document.getElementById('exportEn'),
@@ -260,12 +262,21 @@
   function setLang(lang) {
     const next = lang === 'en' ? 'en' : 'zh';
     if (state.lang === next) return;
+    const wasZh = state.lang === 'zh';
     state.lang = next;
     syncEnglish(activeResume());
     paintEditor();
     renderPreview();
     persist();
     el.editor.scrollTop = 0;
+
+    // 第一次需要英文、又没有配翻译服务：直接把用户带到配置页，
+    // 而不是把他丢在一张空白的英文表单上
+    if (next === 'en' && !hasApiConfig() && !translateSettings.introSeen) {
+      openTranslateSettings({ intro: true });
+    } else if (next === 'en' && !hasApiConfig() && wasZh) {
+      toast('配好翻译服务后，点「批量翻译」就能生成英文版');
+    }
   }
 
   /** 顶部语言开关 + 待翻译提示条 */
@@ -275,17 +286,27 @@
     if (el.langEn) el.langEn.setAttribute('aria-pressed', String(isEn));
     document.body.dataset.lang = state.lang;
 
-    englishMissing = isEn ? countMissingEnglish(resume) : 0;
+    const configured = hasApiConfig();
+    const missing = countMissingEnglish(resume);
+    englishMissing = isEn ? missing : 0;
+
     if (el.noticeBar) {
-      if (isEn && englishMissing > 0) {
-        el.noticeText.innerHTML = '英文版还有 <b>' + englishMissing + '</b> 处未翻译';
+      if (!isEn) {
+        el.noticeBar.hidden = true;
+      } else if (!configured) {
+        // 没配 Key：提示条本身变成入口
+        el.noticeText.innerHTML = '英文版需要先配置翻译服务（用自己的 API Key，质量最好）';
+        el.btnBatchTranslate.textContent = '配置翻译服务';
+        el.noticeBar.hidden = false;
+      } else if (missing > 0) {
+        el.noticeText.innerHTML = '英文版还有 <b>' + missing + '</b> 处未翻译';
+        el.btnBatchTranslate.textContent = '批量翻译';
         el.noticeBar.hidden = false;
       } else {
         el.noticeBar.hidden = true;
       }
     }
     if (el.exportEnCount) {
-      const missing = countMissingEnglish(resume);
       el.exportEnCount.textContent = missing ? missing + ' 处待翻译' : '已完成';
     }
   }
@@ -674,14 +695,24 @@
     }
   }
 
-  function openTranslateSettings() {
+  function openTranslateSettings(options) {
+    const opts = options || {};
     const provider = PROVIDERS.find((p) => p.id === translateSettings.provider) || PROVIDERS[0];
     el.providerSelect.value = provider.id;
     el.baseUrlInput.value = translateSettings.baseUrl || provider.baseUrl;
     el.modelInput.value = translateSettings.model || provider.model;
     el.apiKeyInput.value = translateSettings.apiKey || '';
     el.testResult.textContent = '';
+    // 引导模式：多显示一段说明，告诉用户"为什么要填 Key"
+    if (el.translateIntro) el.translateIntro.hidden = !opts.intro;
+    if (el.btnTranslateSave) {
+      el.btnTranslateSave.textContent = opts.intro ? '保存并翻译' : '保存';
+    }
+    el.settingsDialog.dataset.intro = opts.intro ? '1' : '';
     el.settingsDialog.showModal();
+    if (opts.intro) {
+      setTimeout(() => el.apiKeyInput.focus({ preventScroll: true }), 120);
+    }
   }
 
   function readSettingsFromDialog() {
@@ -1408,13 +1439,21 @@
     /* ---------- 中英切换 ---------- */
     if (el.langZh) el.langZh.addEventListener('click', () => setLang('zh'));
     if (el.langEn) el.langEn.addEventListener('click', () => setLang('en'));
-    if (el.btnBatchTranslate) el.btnBatchTranslate.addEventListener('click', translateAll);
+    // 无 Key 时提示条上的按钮是"配置翻译服务"，配好之后才是"批量翻译"
+    if (el.btnBatchTranslate) {
+      el.btnBatchTranslate.addEventListener('click', () => {
+        if (!hasApiConfig()) openTranslateSettings({ intro: true });
+        else translateAll();
+      });
+    }
 
     /* ---------- 翻译设置 ---------- */
     el.providerSelect.innerHTML = PROVIDERS.map(
       (p) => '<option value="' + p.id + '">' + p.name + '</option>'
     ).join('');
-    if (el.btnTranslateSettings) el.btnTranslateSettings.addEventListener('click', openTranslateSettings);
+    if (el.btnTranslateSettings) {
+      el.btnTranslateSettings.addEventListener('click', () => openTranslateSettings());
+    }
     el.providerSelect.addEventListener('change', () => {
       const provider = PROVIDERS.find((p) => p.id === el.providerSelect.value);
       if (provider && provider.id !== 'custom') {
@@ -1423,14 +1462,25 @@
       }
     });
     el.btnTestApi.addEventListener('click', testConnection);
-    document.getElementById('btnTranslateSave').addEventListener('click', () => {
-      translateSettings = readSettingsFromDialog();
+
+    // 保存：记下"已经看过引导"，配好之后如果正停在英文页，直接开始翻译
+    el.btnTranslateSave.addEventListener('click', () => {
+      translateSettings = Object.assign({}, readSettingsFromDialog(), { introSeen: true });
       saveTranslateSettings(translateSettings);
       el.settingsDialog.close();
       toast('翻译设置已保存');
+      syncLangUi(activeResume());
+      if (state.lang === 'en' && countMissingEnglish(activeResume()) > 0) {
+        translateAll();
+      }
     });
+
     document.querySelectorAll('[data-close-translate]').forEach((btn) => {
-      btn.addEventListener('click', () => el.settingsDialog.close());
+      btn.addEventListener('click', () => {
+        translateSettings = Object.assign({}, translateSettings, { introSeen: true });
+        saveTranslateSettings(translateSettings);
+        el.settingsDialog.close();
+      });
     });
 
     /* ---------- 导出 ---------- */

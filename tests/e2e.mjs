@@ -844,24 +844,46 @@ async function main() {
 
   // 9. 中英双语
   await evaluate(client, `(() => { document.getElementById('btnLangEn').click(); return true; })()`);
-  await sleep(600);
+  await sleep(700);
   const enUi = await evaluate(
     client,
+    `(() => {
+       const dialog = document.getElementById('translateDialog');
+       return {
+         lang: document.body.dataset.lang,
+         dialogOpen: dialog.open,
+         introVisible: !document.getElementById('translateIntro').hidden,
+         saveLabel: document.getElementById('btnTranslateSave').textContent.trim(),
+       };
+     })()`
+  );
+  record(
+    '第一次切英文会引导配置翻译服务',
+    enUi.lang === 'en' && enUi.dialogOpen === true && enUi.introVisible === true && enUi.saveLabel === '保存并翻译',
+    JSON.stringify(enUi)
+  );
+
+  await evaluate(
+    client,
+    `(() => { document.querySelector('#translateDialog [data-close-translate]').click(); return true; })()`
+  );
+  await sleep(400);
+  const afterDismiss = await evaluate(
+    client,
     `(() => ({
-       lang: document.body.dataset.lang,
-       labels: [...document.querySelectorAll('#editorPane .field-label')].map((el) => el.textContent.trim()).slice(0, 6),
+       dialogOpen: document.getElementById('translateDialog').open,
        notice: !document.getElementById('noticeBar').hidden,
        noticeText: document.getElementById('noticeText').textContent,
-       srcHints: document.querySelectorAll('.src-hint').length,
+       buttonLabel: document.getElementById('btnBatchTranslate').textContent.trim(),
      }))()`
   );
   record(
-    '可以切到英文模式',
-    enUi.lang === 'en' &&
-      enUi.labels.some((t) => t.indexOf('Name') === 0) &&
-      enUi.notice === true &&
-      enUi.srcHints > 0,
-    `lang=${enUi.lang} 提示="${enUi.noticeText}" 原文提示=${enUi.srcHints}`
+    '关掉引导后提示条变成配置入口',
+    afterDismiss.dialogOpen === false &&
+      afterDismiss.notice === true &&
+      afterDismiss.noticeText.indexOf('配置翻译服务') !== -1 &&
+      afterDismiss.buttonLabel === '配置翻译服务',
+    JSON.stringify(afterDismiss)
   );
 
   // 9.1 用假的接口验证"批量翻译"整条链路
@@ -873,6 +895,7 @@ async function main() {
          baseUrl: 'https://api.example.com/v1',
          model: 'test-model',
          apiKey: 'sk-test',
+         introSeen: true,
        }));
        return true;
      })()`
@@ -881,6 +904,14 @@ async function main() {
   await sleep(1800);
   await evaluate(client, `(() => { document.getElementById('btnLangEn').click(); return true; })()`);
   await sleep(400);
+  await evaluate(
+    client,
+    `(() => {
+       const dialog = document.getElementById('translateDialog');
+       if (dialog.open) dialog.close();
+       return true;
+     })()`
+  );
   await evaluate(
     client,
     `(() => {

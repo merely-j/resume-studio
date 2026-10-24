@@ -175,6 +175,11 @@
         <button class="icon-btn" type="button" data-close-translate aria-label="关闭">✕</button>
       </div>
       <div class="sheet-body">
+        <div class="translate-intro" id="translateIntro" hidden>
+          <p><b>生成英文版需要接一个翻译服务</b></p>
+          <p>用你自己的 API Key，翻译质量最好；Key 只存在这台设备上，不经过我们的服务器。</p>
+          <p>没有 Key？到服务商开放平台注册一个即可 —— DeepSeek 按量计费，一份简历通常几分钱。</p>
+        </div>
         <label class="field">
           <span class="field-label">服务商</span>
           <select class="input" id="providerSelect"></select>
@@ -198,7 +203,7 @@
         </div>
       </div>
       <div class="sheet-foot">
-        <button class="btn btn-ghost" type="button" data-close-translate>取消</button>
+        <button class="btn btn-ghost" type="button" data-close-translate>稍后自己填写</button>
         <button class="btn btn-primary" id="btnTranslateSave" type="button">保存</button>
       </div>
     </dialog>
