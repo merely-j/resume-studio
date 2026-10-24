@@ -2,11 +2,13 @@
  * 诊断工具：抓 iframe（含沙箱）里的异常、404 和页面状态
  * 用法：
  *   chrome --headless=new --remote-debugging-port=9337 about:blank
- *   node tools/dump-console.mjs http://localhost:8080/tools/sandbox-test.html
+ *   node tools/dump-console.mjs file:///D:/ds_workspace/resume-app/tools/sandbox-test.html
  */
 
 const PORT = process.env.CDP_PORT || 9337;
-const url = process.argv[2] || 'http://localhost:8080/tools/sandbox-test.html';
+const url =
+  process.argv[2] ||
+  new URL('../tools/sandbox-test.html', import.meta.url).href;
 
 const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
 const page = targets.find((t) => t.type === 'page');

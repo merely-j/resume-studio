@@ -5,8 +5,7 @@
  * 再看页面有没有出现提示框。这类问题在用户那里就表现为"只有顶部栏，下面是空的"。
  *
  * 用法：
- *   node server.mjs
- *   chrome --headless=new --remote-debugging-port=9335 http://127.0.0.1:8080/
+ *   chrome --headless=new --remote-debugging-port=9335 file:///D:/ds_workspace/resume-app/index.html
  *   node tools/check-boot.mjs
  */
 

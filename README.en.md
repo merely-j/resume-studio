@@ -69,7 +69,7 @@ Open the link and use your browser's **Add to Home Screen** — it then behaves 
 ### 3. Locally (offline)
 
 - Just double-click `index.html`
-- To open it on your phone from the same Wi-Fi, run `node server.mjs` and use the `http://192.168.x.x:8080/` address it prints
+- To open it on your phone from the same Wi-Fi, serve the folder with any static server (e.g. `python -m http.server 8080`) and browse to `http://<your-lan-ip>:8080/`
 
 ### 4. Build distributables
 
@@ -105,10 +105,9 @@ css/resume.css  A4 paper, three templates, print styles
 Commands:
 
 ```bash
-node server.mjs          # local static server
 node tools/build.mjs     # build all three outputs
 node tests/smoke.mjs     # pure-function tests
-node tests/e2e.mjs       # real-browser end-to-end tests
+node tests/e2e.mjs       # real-browser end-to-end tests (runs against the live site)
 ```
 
 Deeper notes on the design decisions and pitfalls: **[ARCHITECTURE.md](ARCHITECTURE.md)** (Chinese).

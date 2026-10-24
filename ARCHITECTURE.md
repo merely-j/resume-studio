@@ -86,12 +86,16 @@ node tests/e2e.mjs      # 真浏览器：打字、增删、撤销、导出、打
 
 `smoke.mjs` 用 Node 的 `vm` 造一个最小 `window` 环境加载普通脚本，不需要浏览器。
 
-`e2e.mjs` 走 Chrome 调试协议（CDP），不依赖 Puppeteer。跑之前先起服务器和一个带调试端口的 Chrome：
+`e2e.mjs` 走 Chrome 调试协议（CDP），不依赖 Puppeteer。默认直接测线上地址，也可以指定本地文件：
 
 ```bash
-node server.mjs
-chrome --headless=new --remote-debugging-port=9333 http://127.0.0.1:8080/
+# 线上
+chrome --headless=new --remote-debugging-port=9333 https://merely-j.github.io/resume-studio/
 node tests/e2e.mjs
+
+# 本地
+chrome --headless=new --remote-debugging-port=9333 file:///D:/ds_workspace/resume-app/index.html
+APP_URL=file:///D:/ds_workspace/resume-app/index.html node tests/e2e.mjs
 ```
 
 ---

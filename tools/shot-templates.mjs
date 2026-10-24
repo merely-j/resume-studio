@@ -11,7 +11,7 @@
 import { writeFile } from 'node:fs/promises';
 
 const PORT = process.env.CDP_PORT || 9340;
-const APP = process.env.APP_URL || 'http://localhost:8080/';
+const APP = process.env.APP_URL || 'https://merely-j.github.io/resume-studio/';
 const AVATAR = decodeURIComponent(new URL('../tests/fixtures/avatar.jpg', import.meta.url).pathname).replace(/^\//, '');
 
 const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();

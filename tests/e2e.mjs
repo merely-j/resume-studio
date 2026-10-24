@@ -4,14 +4,16 @@
  * 冒烟测试只覆盖"数据 -> HTML"，这个脚本覆盖"用户操作 -> 数据 -> 界面"：
  * 打字、加一条经历、加技能、切模板、刷新后是否还在。
  *
- * 用法（先起好服务器，再开一个带调试端口的 Chrome）：
- *   node server.mjs
- *   chrome --headless=new --remote-debugging-port=9333 http://127.0.0.1:8080/
+ * 默认直接打线上地址，不需要本地服务器：
+ *   chrome --headless=new --remote-debugging-port=9333 https://merely-j.github.io/resume-studio/
  *   node tests/e2e.mjs
+ *
+ * 想测本地文件也行：
+ *   APP_URL=file:///D:/ds_workspace/resume-app/index.html node tests/e2e.mjs
  */
 
 const DEBUG_PORT = process.env.CDP_PORT || 9333;
-const APP_URL = process.env.APP_URL || 'http://127.0.0.1:8080/';
+const APP_URL = process.env.APP_URL || 'https://merely-j.github.io/resume-studio/';
 
 const results = [];
 const record = (name, ok, detail = '') => results.push({ name, ok, detail });

@@ -74,7 +74,7 @@
 ### 3. 本地用（不联网）
 
 - 直接双击 `index.html` 就能用
-- 想在手机上用本地版：`node server.mjs`，手机连同一个 Wi-Fi，打开终端打印的 `http://192.168.x.x:8080/`
+- 想在手机上看电脑里的版本：用任意静态服务器起一个（例如 `python -m http.server 8080`），手机连同一个 Wi-Fi，打开 `http://<电脑局域网IP>:8080/`
 
 ### 4. 打包分发
 
@@ -110,10 +110,9 @@ css/resume.css  A4 纸张、三套模板、打印样式
 开发命令：
 
 ```bash
-node server.mjs          # 本地服务器（带访问日志）
 node tools/build.mjs     # 打包三种产物
 node tests/smoke.mjs     # 纯函数测试
-node tests/e2e.mjs       # 真浏览器端到端测试
+node tests/e2e.mjs       # 真浏览器端到端测试（默认打线上地址）
 ```
 
 更细的取舍、数据流、实现坑点见 **[ARCHITECTURE.md](ARCHITECTURE.md)**。
