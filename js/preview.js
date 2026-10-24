@@ -75,17 +75,51 @@
     return `<ul class="r-bullets">${items.map((item) => `<li>${item}</li>`).join('')}</ul>`;
   };
 
-  const contactList = (basics) =>
-    [
-      // 手机号一律显示成纯数字，不出现短横线或空格
-      ['电话', formatPhone(basics.phone)],
-      ['邮箱', basics.email],
-      ['城市', basics.city],
-      ['主页', basics.link],
-    ].filter(([, value]) => has(value));
+  /** 界面文案（中英各一套）：只用于"联系方式 / 个人信息"这类固定标签 */
+  const UI_LABELS = {
+    zh: {
+      contact: '联系方式',
+      personal: '个人信息',
+      phone: '电话',
+      email: '邮箱',
+      city: '城市',
+      link: '主页',
+      gender: '性别',
+      ethnicity: '民族',
+      birthday: '生日',
+      hometown: '籍贯',
+      politics: '政治面貌',
+    },
+    en: {
+      contact: 'Contact',
+      personal: 'Personal',
+      phone: 'Phone',
+      email: 'Email',
+      city: 'City',
+      link: 'Website',
+      gender: 'Gender',
+      ethnicity: 'Ethnicity',
+      birthday: 'Date of birth',
+      hometown: 'Hometown',
+      politics: 'Political status',
+    },
+  };
 
-  const contactHtml = (basics, sep) =>
-    contactList(basics)
+  const labelsOf = (resume) => UI_LABELS[(resume && resume.lang) === 'en' ? 'en' : 'zh'];
+
+  const contactList = (basics, labels) => {
+    const L = labels || UI_LABELS.zh;
+    return [
+      // 手机号一律显示成纯数字，不出现短横线或空格
+      [L.phone, formatPhone(basics.phone)],
+      [L.email, basics.email],
+      [L.city, basics.city],
+      [L.link, basics.link],
+    ].filter(([, value]) => has(value));
+  };
+
+  const contactHtml = (basics, sep, labels) =>
+    contactList(basics, labels)
       .map(([, value]) => `<span class="r-contact-item">${esc(value)}</span>`)
       .join(`<span class="r-contact-sep">${sep || '·'}</span>`);
 
@@ -94,19 +128,21 @@
    * 留空的字段不会出现在简历里，也不会留下分隔符或空行。
    */
   const PERSONAL_FIELDS = [
-    ['性别', 'gender'],
-    ['民族', 'ethnicity'],
-    ['生日', 'birthday'],
-    ['籍贯', 'hometown'],
-    ['政治面貌', 'politics'],
+    ['gender', 'gender'],
+    ['ethnicity', 'ethnicity'],
+    ['birthday', 'birthday'],
+    ['hometown', 'hometown'],
+    ['politics', 'politics'],
   ];
 
-  const personalList = (basics) =>
-    PERSONAL_FIELDS.map(([label, key]) => {
+  const personalList = (basics, labels) => {
+    const L = labels || UI_LABELS.zh;
+    return PERSONAL_FIELDS.map(([labelKey, key]) => {
       // 生日统一显示成 1995-08 的横杠形式
       const value = key === 'birthday' ? formatBirthday(basics[key]) : basics[key];
-      return [label, value];
+      return [L[labelKey], value];
     }).filter(([, value]) => has(value));
+  };
 
   /** 头部两块的顺序（联系方式 / 个人信息），由用户在编辑器里调 */
   const blockOrder = (basics) =>
@@ -115,11 +151,11 @@
       : ['contact', 'personal'];
 
   /** 经典/极简模板：按顺序拼出联系方式行和个人信息行 */
-  function headBlocks(basics, sep) {
-    const contact = contactHtml(basics, sep);
+  function headBlocks(basics, sep, labels) {
+    const contact = contactHtml(basics, sep, labels);
     const parts = {
       contact: contact ? `<p class="r-contact">${contact}</p>` : '',
-      personal: personalLine(basics),
+      personal: personalLine(basics, labels),
     };
     return blockOrder(basics)
       .map((id) => parts[id] || '')
@@ -127,8 +163,8 @@
   }
 
   /** 经典/极简模板：把有值的个人信息拼成一行 */
-  const personalLine = (basics) => {
-    const items = personalList(basics);
+  const personalLine = (basics, labels) => {
+    const items = personalList(basics, labels);
     if (!items.length) return '';
     return `<p class="r-personal">${items
       .map(([, value]) => esc(value))
@@ -258,7 +294,7 @@
       <div class="r-head-text">
         ${has(b.name) ? `<h1 class="r-name">${esc(b.name)}</h1>` : ''}
         ${has(b.headline) ? `<p class="r-headline">${esc(b.headline)}</p>` : ''}
-        ${headBlocks(b, options.contactSep)}
+        ${headBlocks(b, options.contactSep, labelsOf(resume))}
       </div>
     </header>`;
   }
@@ -305,16 +341,21 @@
 
   function modernTemplate(resume) {
     const b = resume.basics || {};
-    const contacts = contactList(b);
-    const personals = personalList(b);
+    const L = labelsOf(resume);
+    const contacts = contactList(b, L);
+    const personals = personalList(b, L);
 
     const contactBlock = contacts.length
-      ? `<div class="r-side-block"><h2 class="r-side-title">联系方式</h2><ul class="r-side-list">${contacts
+      ? `<div class="r-side-block"><h2 class="r-side-title">${esc(
+          L.contact
+        )}</h2><ul class="r-side-list">${contacts
           .map(([label, value]) => `<li><span>${esc(label)}</span>${esc(value)}</li>`)
           .join('')}</ul></div>`
       : '';
     const personalBlock = personals.length
-      ? `<div class="r-side-block"><h2 class="r-side-title">个人信息</h2><ul class="r-side-list">${personals
+      ? `<div class="r-side-block"><h2 class="r-side-title">${esc(
+          L.personal
+        )}</h2><ul class="r-side-list">${personals
           .map(([label, value]) => `<li><span>${esc(label)}</span>${esc(value)}</li>`)
           .join('')}</ul></div>`
       : '';

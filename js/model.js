@@ -477,13 +477,11 @@
     });
 
     /**
-     * 版式必须和中文稿完全一致：英文没填的字段一律回退到中文原文，
-     * 这样模块不会因为"还没翻译"而整段消失。翻译过的字段用英文。
+     * 英文稿里只放英文：没翻译的字段就空着，绝不用中文顶替。
+     * （版式会随内容多少变化，这是"另一份简历"的自然结果；
+     *   想和中文稿一样，就把内容翻译完整。）
      */
-    const pick = (enValue, zhValue) => {
-      const enText = String(enValue == null ? '' : enValue).trim();
-      return enText || zhValue || '';
-    };
+    const only = (enValue) => String(enValue == null ? '' : enValue);
 
     const customSections = (zh.customSections || []).map((cs) => {
       const ec = (en.customSections || []).find((c) => c.id === cs.id) || { items: [] };
@@ -495,34 +493,34 @@
           const ei = (ec.items || []).find((it) => it.id === item.id) || {};
           return {
             id: item.id,
-            name: pick(ei.name, item.name),
-            role: pick(ei.role, item.role),
-            start: pick(ei.start, enDate(item.start) || item.start),
-            end: pick(ei.end, enDate(item.end) || item.end),
-            desc: pick(ei.desc, item.desc),
+            name: only(ei.name),
+            role: only(ei.role),
+            start: only(ei.start) || enDate(item.start),
+            end: only(ei.end) || enDate(item.end),
+            desc: only(ei.desc),
           };
         }),
       };
     });
 
     const enExtras = (en.extras || []).filter((item) => item.label || item.value);
-    const zhExtras = (zh.extras || []).filter((item) => item.label || item.value);
 
     return Object.assign({}, zh, {
       lang: 'en',
       basics: Object.assign({}, b, {
-        name: pick(eb.name, b.name),
-        headline: pick(eb.headline, b.headline),
-        city: pick(eb.city, b.city),
-        website: pick(eb.website, b.website),
-        summary: pick(eb.summary, b.summary),
-        // 个人信息行也要保留：英文没翻就用中文，行数和中文稿一致
-        gender: pick(eb.gender, b.gender),
-        ethnicity: pick(eb.ethnicity, b.ethnicity),
-        birthday: b.birthday,
-        hometown: pick(eb.hometown, b.hometown),
-        politics: pick(eb.politics, b.politics),
-        // 联系方式沿用中文里填的
+        name: only(eb.name),
+        headline: only(eb.headline),
+        city: only(eb.city),
+        website: only(eb.website),
+        summary: only(eb.summary),
+        // 个人信息行：只在英文填了才显示。没填就是"不要这一行"，
+        // 绝不把中文原文留在一份英文简历里。
+        gender: only(eb.gender),
+        ethnicity: only(eb.ethnicity),
+        birthday: only(eb.birthday),
+        hometown: only(eb.hometown),
+        politics: only(eb.politics),
+        // 联系方式沿用中文里填的（数字和邮箱，与语言无关）
         phone: b.phone,
         email: b.email,
       }),
@@ -530,41 +528,40 @@
         const ei = (en.experience || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          company: pick(ei.company, item.company),
-          role: pick(ei.role, item.role),
-          start: pick(ei.start, enDate(item.start) || item.start),
-          end: pick(ei.end, enDate(item.end) || item.end),
-          desc: pick(ei.desc, item.desc),
+          company: only(ei.company),
+          role: only(ei.role),
+          start: only(ei.start) || enDate(item.start),
+          end: only(ei.end) || enDate(item.end),
+          desc: only(ei.desc),
         };
       }),
       projects: (zh.projects || []).map((item) => {
         const ei = (en.projects || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          name: pick(ei.name, item.name),
-          role: pick(ei.role, item.role),
-          start: pick(ei.start, enDate(item.start) || item.start),
-          end: pick(ei.end, enDate(item.end) || item.end),
-          desc: pick(ei.desc, item.desc),
+          name: only(ei.name),
+          role: only(ei.role),
+          start: only(ei.start) || enDate(item.start),
+          end: only(ei.end) || enDate(item.end),
+          desc: only(ei.desc),
         };
       }),
       education: (zh.education || []).map((item) => {
         const ei = (en.education || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          school: pick(ei.school, item.school),
-          major: pick(ei.major, item.major),
-          degree: pick(ei.degree, item.degree),
-          start: pick(ei.start, enDate(item.start) || item.start),
-          end: pick(ei.end, enDate(item.end) || item.end),
-          desc: pick(ei.desc, item.desc),
+          school: only(ei.school),
+          major: only(ei.major),
+          degree: only(ei.degree),
+          start: only(ei.start) || enDate(item.start),
+          end: only(ei.end) || enDate(item.end),
+          desc: only(ei.desc),
         };
       }),
-      // 技能 / 证书：英文填了就替换，没填保留中文，模块不会消失
-      skills: (en.skills || []).length ? en.skills : zh.skills || [],
-      certs: (en.certs || []).length ? en.certs : zh.certs || [],
-      languages: (en.languages || []).length ? en.languages : zh.languages || [],
-      extras: enExtras.length ? enExtras : zhExtras,
+      skills: en.skills || [],
+      certs: en.certs || [],
+      languages: en.languages || [],
+      extras: enExtras,
       sectionTitles: sectionTitles,
       customSections: customSections,
     });
@@ -587,7 +584,7 @@
       if (!String(value == null ? '' : value).trim()) missing += 1;
     };
     const eb = en.basics || {};
-    ['name', 'headline', 'summary'].forEach((k) => check(eb[k]));
+    ['name', 'headline', 'summary', 'gender', 'ethnicity', 'hometown', 'politics'].forEach((k) => check(eb[k]));
     (en.experience || []).forEach((it) => {
       check(it.company);
       check(it.role);

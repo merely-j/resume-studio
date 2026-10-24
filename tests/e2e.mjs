@@ -886,6 +886,35 @@ async function main() {
     JSON.stringify(afterDismiss)
   );
 
+  // 还没翻译时，英文稿里不能出现任何中文（包括个人信息行）
+  await evaluate(
+    client,
+    `(() => {
+       const dialog = document.getElementById('translateDialog');
+       if (dialog.open) dialog.close();
+       return true;
+     })()`
+  );
+  await sleep(300);
+  const untranslatedPaper = await evaluate(
+    client,
+    `(() => {
+       const paper = document.getElementById('paper');
+       const text = paper ? paper.textContent || '' : 'NO_PAPER';
+       return {
+         lang: document.body.dataset.lang,
+         hasChinese: /[\u4e00-\u9fa5]/.test(text),
+         sample: text.replace(/\s+/g, ' ').trim().slice(0, 60),
+         html: paper ? paper.innerHTML.replace(/\\s+/g, ' ').slice(0, 160) : '',
+       };
+     })()`
+  );
+  record(
+    '未翻译时英文稿不残留中文',
+    untranslatedPaper.lang === 'en' && untranslatedPaper.hasChinese === false,
+    `lang=${untranslatedPaper.lang} 纸面="${untranslatedPaper.sample}" html=${untranslatedPaper.html}`
+  );
+
   // 9.1 用假的接口验证"批量翻译"整条链路
   await evaluate(
     client,
@@ -1009,33 +1038,6 @@ async function main() {
     '预览里点模块会跳回左侧并高亮',
     jumped.ok && jumped.hovered && jumped.flashed,
     JSON.stringify(jumped)
-  );
-
-  // 9.4 版式一致：英文稿的模块数、条目数、要点数、个人信息行必须和中文稿一样
-  const layoutCompare = await evaluate(
-    client,
-    `(() => {
-       const snap = () => ({
-         sections: document.querySelectorAll('#paper .r-section').length,
-         entries: document.querySelectorAll('#paper .r-entry').length,
-         personal: !!document.querySelector('#paper .r-personal'),
-         contact: !!document.querySelector('#paper .r-contact'),
-         skills: !!document.querySelector('#paper .r-skills'),
-       });
-       if (document.body.dataset.lang !== 'zh') document.getElementById('btnLangZh').click();
-       const zh = snap();
-       document.getElementById('btnLangEn').click();
-       const dialog = document.getElementById('translateDialog');
-       if (dialog.open) dialog.close();
-       const en = snap();
-       document.getElementById('btnLangZh').click();
-       return { zh, en };
-     })()`
-  );
-  record(
-    '英文稿版式与中文稿一致',
-    JSON.stringify(layoutCompare.zh) === JSON.stringify(layoutCompare.en),
-    `中=${JSON.stringify(layoutCompare.zh)} 英=${JSON.stringify(layoutCompare.en)}`
   );
 
   client.ws.close();

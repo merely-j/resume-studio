@@ -734,9 +734,9 @@
     }
   }
 
-  function addItem(section) {
+  function addItem(section, scope) {
     const resume = activeResume();
-    const list = listOf(section);
+    const list = listOf(section, scope);
     if (!list) return;
     list.push(section.indexOf('custom:') === 0 ? emptyCustomItem() : emptyItem(section));
     touch(resume);
@@ -750,8 +750,8 @@
     schedulePreview();
   }
 
-  async function removeItem(section, id) {
-    const list = listOf(section);
+  async function removeItem(section, id, scope) {
+    const list = listOf(section, scope);
     if (!list) return;
     const index = list.findIndex((it) => it.id === id);
     if (index === -1) return;
@@ -765,8 +765,8 @@
     pushHistory(before);
   }
 
-  function moveItem(section, id, dir) {
-    const list = listOf(section);
+  function moveItem(section, id, dir, scope) {
+    const list = listOf(section, scope);
     if (!list) return;
     const index = list.findIndex((it) => it.id === id);
     const target = index + dir;
@@ -809,23 +809,25 @@
     pushHistory(before);
   }
 
-  function addChip(value) {
+  function addChip(value, scope) {
     const resume = activeResume();
-    resume.skills = resume.skills || [];
-    if (resume.skills.indexOf(value) !== -1) {
+    const root = scope === 'en' ? syncEnglish(resume) : resume;
+    root.skills = root.skills || [];
+    if (root.skills.indexOf(value) !== -1) {
       toast('这项技能已经添加过了');
       return;
     }
-    resume.skills.push(value);
+    root.skills.push(value);
     touch(resume);
     persist();
     paintEditor({ focusSelector: '[data-chip-input]' });
     schedulePreview();
   }
 
-  function removeChip(index) {
+  function removeChip(index, scope) {
     const resume = activeResume();
-    resume.skills.splice(index, 1);
+    const root = scope === 'en' ? syncEnglish(resume) : resume;
+    root.skills.splice(index, 1);
     touch(resume);
     persist();
     paintEditor({ focusSelector: '[data-chip-input]' });

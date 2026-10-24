@@ -424,29 +424,34 @@
   }
 
   /** 证书条目（原来的独立模块，现在并入"技能与证书"） */
-  function extrasItems(resume) {
-    const items = resume.extras || [];
+  function extrasItems(resume, scope) {
+    const en = scope === 'en';
+    const source = en ? (RS.syncEnglish(resume) || {}).extras : resume.extras;
+    const items = source || [];
+    const scopeAttr = en ? ' data-scope="en"' : '';
     if (!items.length) {
-      return '<p class="empty-hint">还没有证书，点下面的按钮添加。</p>';
+      return `<p class="empty-hint">还没有${en ? '证书 / 语言' : '证书'}，点下面的按钮添加。</p>`;
     }
     return items
       .map((item) => {
         const body = [
           field({
-            label: '类别',
+            label: en ? 'Label' : '类别',
             value: item.label,
             section: 'extras',
             id: item.id,
             name: 'label',
-            placeholder: '证书 / 语言',
+            placeholder: en ? 'Certificate / Language' : '证书 / 语言',
+            scope: scope,
           }),
           field({
-            label: '内容',
+            label: en ? 'Content' : '内容',
             value: item.value,
             section: 'extras',
             id: item.id,
             name: 'value',
-            placeholder: 'PMP（2023）、CET-6',
+            placeholder: en ? 'PMP (2023), CET-6' : 'PMP（2023）、CET-6',
+            scope: scope,
           }),
         ].join('');
         return `
@@ -454,11 +459,11 @@
           <div class="item-bar">
             <span class="item-title">${esc(item.label || '新条目')}</span>
             <span class="item-tools">
-              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="-1"
+              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="-1"${scopeAttr}
                       title="上移" aria-label="上移">↑</button>
-              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="1"
+              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="1"${scopeAttr}
                       title="下移" aria-label="下移">↓</button>
-              <button class="icon-btn icon-btn--danger" data-action="remove-item" data-section="extras" data-id="${item.id}"
+              <button class="icon-btn icon-btn--danger" data-action="remove-item" data-section="extras" data-id="${item.id}"${scopeAttr}
                       title="删除" aria-label="删除">✕</button>
             </span>
           </div>
@@ -649,6 +654,44 @@
       placeholder: 'Product manager with 3 years in B2B SaaS…',
       hint: srcHint(zh.summary),
     })}
+    <p class="form-sub">个人信息（可选，留空则英文简历里不显示这一行）</p>
+    <div class="grid">
+      ${field({
+        label: 'Gender',
+        value: b.gender,
+        bind: 'en.basics.gender',
+        placeholder: 'Male',
+        hint: srcHint(zh.gender),
+      })}
+      ${field({
+        label: 'Ethnicity',
+        value: b.ethnicity,
+        bind: 'en.basics.ethnicity',
+        placeholder: 'Han Chinese',
+        hint: srcHint(zh.ethnicity),
+      })}
+      ${field({
+        label: 'Date of birth',
+        value: b.birthday,
+        bind: 'en.basics.birthday',
+        placeholder: '1995-08',
+        hint: srcHint(zh.birthday),
+      })}
+      ${field({
+        label: 'Hometown',
+        value: b.hometown,
+        bind: 'en.basics.hometown',
+        placeholder: 'Hangzhou, Zhejiang',
+        hint: srcHint(zh.hometown),
+      })}
+      ${field({
+        label: 'Political status',
+        value: b.politics,
+        bind: 'en.basics.politics',
+        placeholder: 'CPC member',
+        hint: srcHint(zh.politics),
+      })}
+    </div>
     <p class="form-sub">联系方式（与中文版共用）</p>
     <p class="en-shared">${esc(contact || '尚未填写手机号 / 邮箱')}</p>`;
     return card({ key: 'basics', title: '基本信息', hint: 'English', body });
@@ -716,12 +759,23 @@
     });
   }
 
-  /** 英文版：技能与证书（英文版是独立的字符串列表） */
+  /** 英文版：技能与证书（和中文版完全一样的交互） */
   function enSkillsCard(resume) {
     const en = RS.syncEnglish(resume) || {};
     const titles = en.sectionTitles || {};
-    const lines = (arr) => (arr || []).join('\n');
+    const skills = en.skills || [];
+    const extras = en.extras || [];
     const zhSkills = (resume.skills || []).join(' / ');
+    const chips = skills
+      .map(
+        (s, i) => `
+      <span class="chip">${esc(s)}
+        <button class="chip-x" data-action="remove-chip" data-index="${i}" data-scope="en" aria-label="删除 ${esc(
+          s
+        )}">✕</button>
+      </span>`
+      )
+      .join('');
     const body = `
     <div class="grid">
       ${field({
@@ -732,19 +786,22 @@
         span: 2,
       })}
     </div>
-    <div class="field" data-span="2">
-      <span class="field-label">技能（每行一个）${srcHint(zhSkills)}</span>
-      <textarea class="textarea" rows="3" data-list-lines="en.skills"
-                placeholder="Figma&#10;SQL">${esc(lines(en.skills))}</textarea>
+    <p class="form-sub">技能 ${srcHint(zhSkills)}</p>
+    <div class="chip-add">
+      <input class="input" data-chip-input data-scope="en" placeholder="输入技能后按回车，如 Figma" />
+      <button class="btn btn-sm" data-action="add-chip" data-scope="en">添加</button>
     </div>
-    <div class="field" data-span="2">
-      <span class="field-label">证书 / 语言（每行一条，显示在技能下面）</span>
-      <textarea class="textarea" rows="3" data-extras-lines="en.extras"
-                placeholder="PMP (2023)&#10;English — professional working proficiency">${esc(
-                  (en.extras || []).map((item) => item.value || item.label).filter(Boolean).join('\n')
-                )}</textarea>
-    </div>`;
-    return card({ key: 'skills', title: '技能与证书', hint: 'English', body });
+    ${chips ? `<div class="chips">${chips}</div>` : ''}
+
+    <p class="form-sub">证书 / 其他</p>
+    <div class="items">${extrasItems(resume, 'en')}</div>
+    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="extras" data-scope="en">＋ 添加证书</button>`;
+    return card({
+      key: 'skills',
+      title: '技能与证书',
+      count: skills.length + extras.length || undefined,
+      body: body,
+    });
   }
 
   /** 英文版：自定义模块（标题沿用中文，条目可编辑） */
@@ -912,7 +969,7 @@
       if (el.matches('[data-chip-input]') && event.key === 'Enter') {
         event.preventDefault();
         const value = el.value.trim();
-        if (value) handlers.addChip(value);
+        if (value) handlers.addChip(value, el.dataset.scope);
         el.value = '';
       }
     });
@@ -965,23 +1022,24 @@
       const id = btn.dataset.id;
       const dir = btn.dataset.dir;
       const index = btn.dataset.index;
+      const scope = btn.dataset.scope;
 
       if (action === 'add-item') {
-        handlers.addItem(section);
+        handlers.addItem(section, scope);
       } else if (action === 'remove-custom') {
         handlers.removeCustomSection(btn.dataset.custom);
       } else if (action === 'add-custom') {
         handlers.addCustomSection();
       } else if (action === 'remove-item') {
-        handlers.removeItem(section, id);
+        handlers.removeItem(section, id, scope);
       } else if (action === 'move-item') {
-        handlers.moveItem(section, id, Number(dir));
+        handlers.moveItem(section, id, Number(dir), scope);
       } else if (action === 'remove-chip') {
-        handlers.removeChip(Number(index));
+        handlers.removeChip(Number(index), scope);
       } else if (action === 'add-chip') {
         const input = root.querySelector('[data-chip-input]');
         const value = input && input.value.trim();
-        if (value) handlers.addChip(value);
+        if (value) handlers.addChip(value, scope);
         if (input) input.value = '';
       } else if (action === 'pick-photo') {
         const input = root.querySelector('[data-photo-input]');

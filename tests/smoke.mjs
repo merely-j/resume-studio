@@ -339,6 +339,51 @@ check('JSON 导出后能原样导入', () => {
   assert.equal(restored.experience[0].company, sample.experience[0].company);
 });
 
+check('英文稿不残留任何中文', () => {
+  const resume = sampleResume();
+  // 完全不翻译时：纸面上不应该出现一个汉字
+  const enHtml = renderResume(RS.localizedResume(resume, 'en'));
+  const text = enHtml.replace(/<[^>]*>/g, '');
+  assert.ok(!/[\u4e00-\u9fa5]/.test(text), '英文稿里出现了中文：' + text.slice(0, 80));
+});
+
+check('英文内容填全后，模块结构与中文一致', () => {
+  const resume = sampleResume();
+  const en = RS.syncEnglish(resume);
+  en.basics.name = 'Xiao Chen';
+  en.basics.headline = 'Senior Product Manager';
+  en.basics.summary = 'Product manager with 3 years in B2B SaaS.';
+  en.basics.gender = 'Male';
+  en.basics.ethnicity = 'Han Chinese';
+  en.basics.birthday = '1995-08';
+  en.basics.hometown = 'Hangzhou';
+  en.basics.politics = 'CPC member';
+  en.experience.forEach((item) => {
+    item.company = 'Acme Tech';
+    item.role = 'Product Manager';
+    item.desc = 'Owned the collaboration suite';
+  });
+  en.projects.forEach((item) => {
+    item.name = 'Permissions Center';
+    item.role = 'Product Lead';
+    item.desc = 'Designed the role model';
+  });
+  en.education.forEach((item) => {
+    item.school = 'Zhejiang University';
+    item.degree = 'B.S. in Information Management';
+    item.desc = 'GPA 3.7/4.0';
+  });
+  en.skills = ['Figma', 'SQL'];
+  en.extras = [{ id: 'e1', label: 'Certificate', value: 'PMP (2023)' }];
+
+  const count = (html, needle) => (html.match(new RegExp(needle, 'g')) || []).length;
+  const zhHtml = renderResume(resume);
+  const enHtml = renderResume(RS.localizedResume(resume, 'en'));
+  assert.equal(count(enHtml, 'class="r-section"'), count(zhHtml, 'class="r-section"'), '模块数不一致');
+  assert.equal(count(enHtml, 'class="r-entry"'), count(zhHtml, 'class="r-entry"'), '条目数不一致');
+  assert.ok(!/[\u4e00-\u9fa5]/.test(enHtml.replace(/<[^>]*>/g, '')), '英文稿里出现了中文');
+});
+
 check('导入非法文件会给出明确错误', () => {
   assert.throws(() => importJson('{"foo":1}'), /缺少简历内容/);
 });
