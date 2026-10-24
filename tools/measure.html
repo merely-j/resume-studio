@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>布局测量</title>
+    <style>
+      body {
+        margin: 0;
+        font: 13px/1.5 Consolas, monospace;
+        background: #111;
+        color: #eee;
+        display: flex;
+        gap: 16px;
+        padding: 12px;
+      }
+      iframe {
+        width: 390px;
+        height: 844px;
+        border: 0;
+        background: #fff;
+        flex: none;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 390x844 的 iframe 才能让里面的媒体查询按手机宽度生效 -->
+    <iframe id="phone"></iframe>
+    <pre id="out">measuring…</pre>
+    <script>
+      const frame = document.getElementById('phone');
+      const params = new URLSearchParams(location.search);
+      const view = params.get('view');
+      // 可选 ?w=1440&h=980 测桌面尺寸；默认手机 390x844
+      if (params.get('w')) {
+        frame.style.width = `${Number(params.get('w'))}px`;
+        frame.style.height = `${Number(params.get('h') || 980)}px`;
+      }
+      frame.src = `../index.html${view ? `?view=${encodeURIComponent(view)}` : ''}`;
+
+      function report() {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const rect = (selector) => {
+          const node = doc.querySelector(selector);
+          if (!node) return 'missing';
+          const r = node.getBoundingClientRect();
+          return `${Math.round(r.width)}x${Math.round(r.height)} @x${Math.round(r.left)}`;
+        };
+
+        const grid = doc.querySelector('#editorPane .grid');
+        const columns = grid ? getComputedStyle(grid).gridTemplateColumns : '-';
+        const edge = (selector) => {
+          const node = doc.querySelector(selector);
+          if (!node) return 'missing';
+          const r = node.getBoundingClientRect();
+          return `left ${Math.round(r.left)} right ${Math.round(r.right)} width ${Math.round(r.width)}`;
+        };
+
+        const lines = [
+          `viewport        ${win.innerWidth} x ${win.innerHeight} (dpr ${win.devicePixelRatio})`,
+          `body client     ${doc.body.clientWidth}`,
+          `body scroll     ${doc.body.scrollWidth}   <-- 大于 client 就是横向溢出`,
+          `html scroll     ${doc.documentElement.scrollWidth}`,
+          `app             ${rect('.app')}`,
+          `header          ${rect('.app-header')}`,
+          `toolbar         ${rect('.toolbar')}`,
+          `workspace       ${rect('.workspace')}`,
+          `editor          ${rect('#editorPane')}`,
+          `card            ${rect('#editorPane .card')}`,
+          `card body       ${rect('#editorPane .card-body')}`,
+          `first grid      ${rect('#editorPane .grid')}`,
+          `grid columns    ${columns}`,
+          `field 1         ${edge('#editorPane .grid .field:nth-child(1)')}`,
+          `field 2         ${edge('#editorPane .grid .field:nth-child(2)')}`,
+          `input 2         ${edge('#editorPane .grid .field:nth-child(2) input')}`,
+          `preview display ${getComputedStyle(doc.querySelector('.preview-pane')).display}`,
+          `paper           ${rect('#paper')}`,
+          `paper transform ${getComputedStyle(doc.querySelector('#paper')).transform}`,
+          `paper scrollH   ${doc.querySelector('#paper').scrollHeight}`,
+          `overflow hint   hidden=${doc.querySelector('#overflowHint').hidden} text="${doc.querySelector('#overflowHint').textContent}"`,
+        ];
+        document.getElementById('out').textContent = lines.join('\n');
+      }
+
+      frame.addEventListener('load', () => setTimeout(report, 600));
+    </script>
+  </body>
+</html>

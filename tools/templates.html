@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>模板预览</title>
+    <link rel="stylesheet" href="../css/resume.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #e8ebf2;
+        font-family: system-ui, sans-serif;
+      }
+      .paper {
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="paper" id="paper"></div>
+
+    <!-- 与 index.html 一致：普通脚本，按依赖顺序加载 -->
+    <script src="../js/model.js"></script>
+    <script src="../js/preview.js"></script>
+    <script>
+      // 设计校对用：?t=modern / ?t=minimal / ?t=classic 以 1:1 渲染单个模板
+      (function () {
+        var template = new URLSearchParams(location.search).get('t') || 'classic';
+        var resume = window.RS.sampleResume();
+        resume.template = template;
+        document.getElementById('paper').innerHTML = window.RS.renderResume(resume);
+        document.title = '模板预览 · ' + template;
+      })();
+    </script>
+  </body>
+</html>

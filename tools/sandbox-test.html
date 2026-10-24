@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>沙箱环境测试</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      iframe {
+        width: 100vw;
+        height: 100vh;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 模拟"内嵌预览窗口"：只有 allow-scripts，没有 allow-same-origin。
+         ES Module 在这种环境里会被同源策略拒绝加载，普通脚本不受影响。 -->
+    <iframe src="../index.html" sandbox="allow-scripts"></iframe>
+  </body>
+</html>

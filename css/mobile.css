@@ -1,0 +1,61 @@
+/* ==========================================================================
+   手机版专用样式（只在 `node tools/build.mjs` 生成的手机版里加载）
+   --------------------------------------------------------------------------
+   网站版不引这个文件，所以桌面/网页形态不受影响。
+   目标：点按区域更大、底部固定"看预览 / 导出 PDF"操作条，单手就能走完流程。
+   ========================================================================== */
+
+@media screen and (max-width: 1023px) {
+  /* 底部操作条 */
+  .quick-actions {
+    display: flex;
+    gap: 10px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  .quick-actions .btn {
+    flex: 1;
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  /* 留出底部空间，内容不会被操作条挡住 */
+  body {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  /* 提示条也要抬起来，否则被操作条盖住 */
+  .toast {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  /* 更大的点按目标 */
+  .input {
+    min-height: 48px;
+  }
+
+  .card-head {
+    padding: 16px;
+  }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .segmented-btn {
+    padding: 9px 20px;
+  }
+
+  .chip-x {
+    padding: 6px;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "resume-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "手机上编辑简历并导出 PDF 的 PWA 原型",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node tools/build.mjs",
+    "test": "node tests/smoke.mjs",
+    "test:e2e": "node tests/e2e.mjs"
+  }
+}

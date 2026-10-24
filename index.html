@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>简历工坊 · 手机上修改简历</title>
+    <meta name="description" content="在手机上填写、排版并导出 PDF 简历，所有数据只保存在自己的设备上。" />
+    <!-- 分享到微信/微博/Slack 时的卡片信息；绑定自己的域名后，把 og:url / og:image 换成绝对地址 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="简历工坊" />
+    <meta property="og:title" content="简历工坊 · 手机上改简历" />
+    <meta property="og:description" content="填表即排版，三套模板、照片、一键压缩到一页，导出 A4 PDF。数据只存在本机。" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="简历工坊" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="stylesheet" href="./css/app.css" />
+    <link rel="stylesheet" href="./css/resume.css" />
+  </head>
+  <body data-view="edit">
+    <!-- JS 被完全禁用时，至少告诉用户发生了什么，而不是留一片空白 -->
+    <noscript>
+      <div style="position: fixed; inset: 16px; z-index: 99; background: #fff5f5; border: 1px solid #feb2b2; color: #7b1d1d; padding: 18px 20px; border-radius: 12px; font: 14px/1.7 system-ui, sans-serif;">
+        <strong>页面需要 JavaScript 才能运行</strong>
+        <p>请在浏览器设置里允许 JavaScript 后刷新；或换用 Chrome / Edge / Safari 打开。</p>
+      </div>
+    </noscript>
+
+    <!-- 启动自检：模块加载失败或没有渲染出内容时，把原因显示在页面上 -->
+    <div
+      id="bootError"
+      hidden
+      style="position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 99; max-height: 60vh; overflow: auto; background: #fff5f5; border: 1px solid #feb2b2; color: #7b1d1d; padding: 14px 16px; border-radius: 12px; font: 13px/1.6 system-ui, sans-serif; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);"
+    >
+      <strong id="bootErrorTitle">出错了</strong>
+      <pre id="bootErrorDetail" style="white-space: pre-wrap; margin: 8px 0; font: 12px/1.5 ui-monospace, Consolas, monospace;"></pre>
+      <p style="margin: 0 0 10px; font-size: 12px; opacity: 0.8;">
+        把上面的文字发我就能定位；也可以按 Ctrl+Shift+R 强制刷新试试。
+      </p>
+      <button
+        id="bootReset"
+        type="button"
+        style="appearance: none; border: 1px solid #f0a5a5; background: #fff; color: #7b1d1d; font: 600 12px system-ui, sans-serif; padding: 7px 12px; border-radius: 8px; cursor: pointer;"
+      >
+        清除缓存并重新加载
+      </button>
+    </div>
+
+    <div class="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">简</span>
+          <span class="brand-text">
+            <strong id="docName">我的简历</strong>
+            <small>简历工坊</small>
+          </span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" id="btnResumes" type="button">我的简历</button>
+          <button class="btn btn-primary" id="btnExportPdf" type="button">导出 PDF</button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="segmented" role="tablist" aria-label="切换编辑与预览">
+          <button class="segmented-btn is-active" data-view-btn="edit" role="tab" aria-selected="true" type="button">
+            编辑
+          </button>
+          <button class="segmented-btn" data-view-btn="preview" role="tab" aria-selected="false" type="button">
+            预览
+          </button>
+        </div>
+        <div class="history-btns">
+          <button class="icon-btn" id="btnUndo" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销" disabled>
+            ↶
+          </button>
+          <button class="icon-btn" id="btnRedo" type="button" title="恢复 (Ctrl+Shift+Z)" aria-label="恢复" disabled>
+            ↷
+          </button>
+        </div>
+        <div class="toolbar-selects">
+          <label class="tpl-select">
+            <span>模板</span>
+            <select id="templateSelect" aria-label="选择简历模板"></select>
+          </label>
+          <label class="tpl-select">
+            <span>字号</span>
+            <span class="num-field">
+              <input id="fontSizeInput" type="number" min="8" max="14" step="0.5" inputmode="decimal"
+                     aria-label="正文字号，单位 pt" />
+              <span class="num-unit">pt</span>
+            </span>
+          </label>
+          <label class="tpl-select">
+            <span>页边距</span>
+            <select id="pageMarginSelect" aria-label="调整页边距"></select>
+          </label>
+          <label class="tpl-select">
+            <span>间距</span>
+            <span class="num-field">
+              <input id="sectionGapInput" type="number" min="0" max="40" step="1" inputmode="numeric"
+                     aria-label="模块间距，单位像素" />
+              <span class="num-unit">px</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <main class="workspace">
+        <section class="editor-pane" id="editorPane" aria-label="简历编辑表单"></section>
+
+        <section class="preview-pane" aria-label="简历预览">
+          <div class="preview-bar">
+            <p class="overflow-hint" id="overflowHint" hidden></p>
+            <button class="btn btn-sm btn-ghost" id="btnFit" type="button" aria-pressed="false">
+              压缩到一页
+            </button>
+          </div>
+          <div class="paper-wrap" id="paperWrap">
+            <div class="paper" id="paper"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="sheet" id="resumeDialog" aria-label="我的简历">
+      <div class="sheet-head">
+        <h2>我的简历</h2>
+        <button class="icon-btn" id="btnCloseDialog" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <div class="new-row">
+          <input class="input" id="newResumeName" placeholder="新简历名称，例如：产品经理版" />
+          <button class="btn btn-primary" id="btnCreateResume" type="button">新建</button>
+        </div>
+        <ul class="resume-list" id="resumeList"></ul>
+      </div>
+    </dialog>
+
+    <!-- 站内确认框：沙箱/内嵌环境里 window.confirm 会被浏览器直接忽略，必须自己实现 -->
+    <dialog class="sheet sheet--confirm" id="confirmDialog" aria-label="确认操作">
+      <div class="sheet-body">
+        <p class="confirm-text" id="confirmText"></p>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" id="btnConfirmCancel" type="button">取消</button>
+        <button class="btn btn-danger" id="btnConfirmOk" type="button">确定删除</button>
+      </div>
+    </dialog>
+
+    <!-- 手机版的底部操作条：只在手机版构建里显示（见 css/mobile.css） -->
+    <div class="quick-actions">
+      <button class="btn btn-ghost" id="btnQuickView" type="button">看预览</button>
+      <button class="btn btn-primary" id="btnQuickExport" type="button">导出 PDF</button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      // 启动自检（普通脚本，不依赖模块加载）：
+      // 1. 捕获脚本加载失败 / 运行时报错
+      // 2. 2 秒后如果编辑区仍然是空的，说明应用没启动，把原因显示出来
+      (function () {
+        var errors = [];
+
+        function show(title, detail) {
+          var box = document.getElementById('bootError');
+          if (!box) return;
+          box.hidden = false;
+          document.getElementById('bootErrorTitle').textContent = title;
+          document.getElementById('bootErrorDetail').textContent = detail;
+        }
+
+        // 给 app.js 用：启动异常时把真实错误显示出来
+        // （沙箱环境里 window.onerror 只能拿到脱敏的 "Script error."，
+        //   只有自己 try/catch 才能拿到 message 和堆栈）
+        window.__resumeBootError = show;
+
+        // 一键自愈：清掉 Service Worker 和缓存后重载（应对"旧版本被缓存"）
+        var resetBtn = document.getElementById('bootReset');
+        if (resetBtn) {
+          resetBtn.addEventListener('click', function () {
+            resetBtn.textContent = '正在清理…';
+            var tasks = [];
+            // 注意：沙箱 iframe 里访问 navigator.serviceWorker 会抛 SecurityError，
+            // 必须包起来，否则"清理"按钮自己先崩掉。
+            try {
+              if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                tasks.push(
+                  navigator.serviceWorker.getRegistrations().then(function (list) {
+                    return Promise.all(
+                      list.map(function (reg) {
+                        return reg.unregister();
+                      })
+                    );
+                  })
+                );
+              }
+            } catch (err) {
+              /* 当前环境不支持，跳过 */
+            }
+            try {
+              if (window.caches && caches.keys) {
+                tasks.push(
+                  caches.keys().then(function (keys) {
+                    return Promise.all(
+                      keys.map(function (key) {
+                        return caches.delete(key);
+                      })
+                    );
+                  })
+                );
+              }
+            } catch (err) {
+              /* 同上 */
+            }
+            Promise.all(tasks)
+              .catch(function () {})
+              .then(function () {
+                location.reload();
+              });
+          });
+        }
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            var node = event.target;
+            if (node && node.tagName === 'SCRIPT') {
+              errors.push('脚本加载失败: ' + (node.src || '(inline)'));
+            } else if (node && node.tagName === 'LINK') {
+              errors.push('样式加载失败: ' + (node.href || '(inline)'));
+            } else {
+              errors.push(
+                (event.message || '脚本错误') +
+                  (event.filename ? ' @ ' + event.filename.split('/').pop() + ':' + event.lineno : '')
+              );
+            }
+            show('页面脚本出错', errors.join('\n'));
+          },
+          true
+        );
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          errors.push('未处理的错误: ' + (reason && reason.message ? reason.message : String(reason)));
+          show('页面脚本出错', errors.join('\n'));
+        });
+
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            var pane = document.getElementById('editorPane');
+            if (pane && pane.children.length === 0) {
+              show(
+                '应用没有启动',
+                errors.length
+                  ? errors.join('\n')
+                  : '脚本已加载，但 2 秒内没有渲染出表单。\n可能是浏览器缓存了旧版本：按 Ctrl+Shift+R 强制刷新；\n仍不行请按 F12 打开 Console，把红色报错发我。'
+              );
+            }
+          }, 2000);
+        });
+      })();
+    </script>
+
+    <!-- 普通脚本，按依赖顺序加载。
+         不用 ES Module 的原因：模块脚本在 file:// 和"沙箱 iframe"里会被
+         同源策略拒绝，页面会直接空白。普通脚本没有这个限制。 -->
+    <script src="./js/model.js"></script>
+    <script src="./js/store.js"></script>
+    <script src="./js/preview.js"></script>
+    <script src="./js/editor.js"></script>
+    <script src="./js/app.js"></script>
+
+    <!-- ICP_FOOTER：国内备案后，用 node tools/set-icp.mjs "京ICP备xxxx号" 在这里注入备案号 -->
+  </body>
+</html>

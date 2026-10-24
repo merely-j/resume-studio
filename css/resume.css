@@ -1,0 +1,568 @@
+/* ==========================================================================
+   简历排版（A4 纸张）与打印
+   --------------------------------------------------------------------------
+   尺寸全部用 mm / pt，屏幕预览和打印结果是同一套 CSS，
+   所以"预览里长什么样，导出的 PDF 就长什么样"。
+   移动端用 transform: scale() 缩放整张纸，不影响内部的毫米尺寸。
+   ========================================================================== */
+
+.paper {
+  width: 210mm;
+  min-height: 297mm;
+  /* 必须是不可收缩的 flex 项：否则窄容器会把 A4 压成容器宽度，
+     缩放后文字会异常小。用 transform 缩放是为了保持内部毫米尺寸不变。 */
+  flex: none;
+  background: #ffffff;
+  color: #000;
+  transform-origin: top center;
+  border-radius: 2px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  display: flex;
+  overflow: hidden;
+  /* 页边距：由工具栏的"页边距"控制，三套模板共用这一个值（毫米） */
+  padding: calc(var(--page-margin, 16) * 1mm);
+}
+
+.r-inner {
+  flex: 1;
+  min-width: 0;
+  /* 全文统一微软雅黑；没有这个字体的系统（macOS/iOS）退回苹方，观感接近 */
+  font-family: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Hiragino Sans GB",
+    "Heiti SC", sans-serif;
+  font-size: calc(10.5pt * var(--fs, 1));
+  /* 行距也能被"压缩到一页"收紧，--lh 默认 1 */
+  line-height: calc(1.65 * var(--lh, 1));
+  color: #000;
+}
+
+.r-inner * {
+  box-sizing: border-box;
+}
+
+/* ---------------------------- 通用元素 ---------------------------- */
+
+.r-name {
+  margin: 0;
+  font-size: calc(24pt * var(--fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.r-headline {
+  margin: 2px 0 0;
+  font-size: calc(10.5pt * var(--fs, 1));
+  color: #000;
+}
+
+.r-contact {
+  margin: 3px 0 0;
+  font-size: calc(9.5pt * var(--fs, 1));
+  color: #000;
+}
+
+.r-contact-item {
+  white-space: nowrap;
+}
+
+.r-contact-sep {
+  margin: 0 7px;
+  color: #000;
+}
+
+/* 可选的个人信息行（性别/民族/生日/籍贯/政治面貌） */
+.r-personal {
+  margin: 2px 0 0;
+  font-size: calc(9.5pt * var(--fs, 1));
+  line-height: 1.5;
+}
+
+.r-section {
+  /* 模块之间的垂直间距，由工具栏/模块顺序里的"模块间距"控制 */
+  margin-top: calc(var(--gap, 13) * 1px);
+}
+
+.r-section-title {
+  margin: 0 0 7px;
+  padding-bottom: 3px;
+  font-size: calc(11pt * var(--fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid #9ca3af;
+}
+
+.r-summary {
+  margin: 0;
+  text-align: justify;
+}
+
+.r-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.r-entry {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.r-entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.r-entry-main {
+  min-width: 0;
+}
+
+.r-entry-title {
+  font-weight: 700;
+  font-size: calc(10.5pt * var(--fs, 1));
+}
+
+.r-entry-sub {
+  margin-left: 8px;
+  font-size: calc(10pt * var(--fs, 1));
+  color: #000;
+}
+
+.r-entry-date {
+  flex: none;
+  font-size: calc(9pt * var(--fs, 1));
+  color: #000;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.r-bullets {
+  margin: 3px 0 0;
+  padding-left: 1.05em;
+}
+
+.r-bullets li {
+  margin: 1.5px 0;
+  text-align: justify;
+}
+
+.r-bullets li::marker {
+  color: #000;
+  font-size: 0.9em;
+}
+
+.r-skills {
+  margin: 0;
+}
+
+.r-dot {
+  margin: 0 6px;
+  color: #000;
+}
+
+.r-extras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.r-extra-label {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.r-tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+}
+
+.r-tags li {
+  padding: 2px 8px;
+  font-size: calc(9pt * var(--fs, 1));
+  border-radius: 3px;
+  background: #f1f5f9;
+}
+
+/* 证件照：靠右放，姓名等信息在左侧居中 */
+
+.r-photo {
+  display: block;
+  object-fit: cover;
+  background: #f3f4f6;
+}
+
+.r-head--with-photo {
+  position: relative;
+}
+
+.r-head-text {
+  min-width: 0;
+}
+
+/* ---------------------------- 模板一：经典单栏 ---------------------------- */
+
+.tpl-classic {
+  padding: 0;
+}
+
+.tpl-classic .r-head--center {
+  text-align: center;
+  padding-bottom: 9px;
+}
+
+.tpl-classic .r-name {
+  color: #000;
+}
+
+.tpl-classic .r-headline {
+  color: #000;
+  font-weight: 600;
+}
+
+.tpl-classic .r-contact {
+  color: #000;
+}
+
+.tpl-classic .r-section-title {
+  color: #000;
+  border-bottom: 1px solid #9ca3af;
+}
+
+/* 有照片时：左右等距内缩，保证姓名仍然居中，照片贴在右上角 */
+
+.tpl-classic .r-head--with-photo {
+  min-height: 33mm;
+  /* 雅黑比原来的字体宽，留白收到 26mm，四个联系方式才能排成一行 */
+  padding: 0 26mm 9px;
+}
+
+.tpl-classic .r-photo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 26mm;
+  height: 32mm;
+  border-radius: 2px;
+  border: 1px solid #e5e7eb;
+}
+
+/* ---------------------------- 模板二：现代双栏 ---------------------------- */
+
+.tpl-modern {
+  display: grid;
+  grid-template-columns: 62mm 1fr;
+  /* 1fr 让侧栏一直铺到纸张底部，不会出现"半截色块" */
+  grid-template-rows: 1fr;
+  align-items: stretch;
+}
+
+.tpl-modern .r-side {
+  padding: 9mm 7mm;
+  /* 原来这里是深蓝底白字。要求"全文黑字"后，白字在黑底上读不了，
+     所以侧栏换成浅灰底，用一条分隔线保留左右两栏的层次。 */
+  background: #f4f5f8;
+  color: #000;
+  border-right: 1px solid #dfe4ee;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.tpl-modern .r-main {
+  padding: 9mm 8mm 9mm 9mm;
+}
+
+.tpl-modern .r-side .r-name {
+  font-size: calc(19pt * var(--fs, 1));
+  color: #000;
+  letter-spacing: 0.06em;
+}
+
+.tpl-modern .r-side .r-headline {
+  margin-top: 8px;
+  font-size: calc(9.5pt * var(--fs, 1));
+  color: #000;
+  line-height: 1.5;
+}
+
+.tpl-modern .r-side-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #9ca3af;
+}
+
+/* 双栏模板：照片放在侧栏顶部，居中且有留白 */
+.tpl-modern .r-photo--side {
+  width: 34mm;
+  margin: 0 auto 10px;
+  aspect-ratio: 4 / 5;
+  height: auto;
+  border-radius: 3px;
+  border: 2px solid #cfd6e3;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.tpl-modern .r-side-block {
+  margin-top: calc(var(--gap, 13) * 1px);
+}
+
+.tpl-modern .r-side-title {
+  margin: 0 0 7px;
+  padding-bottom: 3px;
+  font-size: calc(8.5pt * var(--fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #000;
+  border-bottom: 1px solid #9ca3af;
+}
+
+.tpl-modern .r-side-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: calc(9pt * var(--fs, 1));
+  line-height: 1.5;
+  color: #000;
+}
+
+.tpl-modern .r-side-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  word-break: break-all;
+}
+
+.tpl-modern .r-side-list li span {
+  flex: none;
+  color: #000;
+}
+
+.tpl-modern .r-side-list--plain li {
+  display: block;
+}
+
+/* 侧栏里的通用区块换成浅色 */
+
+.tpl-modern .r-side .r-section {
+  margin-top: calc(var(--gap, 13) * 1px);
+}
+
+.tpl-modern .r-side .r-section-title {
+  margin: 0 0 7px;
+  padding-bottom: 3px;
+  font-size: calc(8.5pt * var(--fs, 1));
+  letter-spacing: 0.16em;
+  color: #000;
+  border-bottom: 1px solid #9ca3af;
+}
+
+.tpl-modern .r-side .r-entry-title {
+  color: #000;
+  font-size: calc(9.5pt * var(--fs, 1));
+}
+
+.tpl-modern .r-side .r-entry-sub {
+  display: block;
+  margin: 1px 0 0;
+  color: #000;
+  font-size: calc(8.5pt * var(--fs, 1));
+}
+
+.tpl-modern .r-side .r-entry-date {
+  color: #000;
+  font-size: calc(8.5pt * var(--fs, 1));
+}
+
+.tpl-modern .r-side .r-entry-head {
+  flex-direction: column;
+  gap: 0;
+}
+
+.tpl-modern .r-side .r-bullets {
+  color: #000;
+  font-size: calc(8.5pt * var(--fs, 1));
+  padding-left: 1em;
+}
+
+.tpl-modern .r-side .r-bullets li::marker {
+  color: #000;
+}
+
+.tpl-modern .r-side .r-extra-label {
+  color: #000;
+}
+
+.tpl-modern .r-side .r-extras {
+  font-size: calc(8.5pt * var(--fs, 1));
+  color: #000;
+}
+
+.tpl-modern .r-main .r-section-title {
+  color: #000;
+  border-bottom: 1px solid #9ca3af;
+}
+
+.tpl-modern .r-main .r-section-title::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 10pt;
+  margin-right: 7px;
+  vertical-align: -1px;
+  border-radius: 2px;
+  background: #000;
+}
+
+/* ---------------------------- 模板三：极简黑白 ---------------------------- */
+
+.tpl-minimal {
+  padding: 0;
+  /* 之前是衬线字体；按要求全文统一微软雅黑，这里不再覆盖 font-family */
+  font-size: calc(10.5pt * var(--fs, 1));
+}
+
+.tpl-minimal .r-name {
+  font-size: calc(22pt * var(--fs, 1));
+  font-weight: 400;
+  letter-spacing: 0.12em;
+}
+
+.tpl-minimal .r-headline {
+  font-size: calc(10pt * var(--fs, 1));
+  color: #000;
+  letter-spacing: 0.04em;
+}
+
+.tpl-minimal .r-contact {
+  font-size: calc(9pt * var(--fs, 1));
+  color: #000;
+}
+
+.tpl-minimal .r-head {
+  /* 和经典模板保持一致：基本信息下面不再画线 */
+  padding-bottom: 10px;
+}
+
+/* 极简模板：照片靠右，黑白处理，和整体风格一致 */
+.tpl-minimal .r-head--with-photo {
+  min-height: 28mm;
+  padding-right: 30mm;
+}
+
+.tpl-minimal .r-photo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22mm;
+  height: 27mm;
+  filter: grayscale(100%);
+  border: 1px solid #d4d4d4;
+}
+
+.tpl-minimal .r-section {
+  margin-top: calc(var(--gap, 13) * 1px);
+}
+
+.tpl-minimal .r-section-title {
+  font-size: calc(9pt * var(--fs, 1));
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  color: #000;
+  border-bottom: 1px solid #9ca3af;
+}
+
+.tpl-minimal .r-entry-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tpl-minimal .r-entry-sub {
+  color: #000;
+}
+
+.tpl-minimal .r-entry-date {
+  font-style: italic;
+  color: #000;
+}
+
+.tpl-minimal .r-bullets li::marker {
+  color: #000;
+}
+
+/* ---------------------------- 打印 / 导出 PDF ---------------------------- */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* 打印时只留纸张本身：顶部栏、工具栏、编辑器、预览区顶栏、
+     手机版底部操作条全部隐藏 */
+  .app-header,
+  .toolbar,
+  .editor-pane,
+  .preview-bar,
+  .overflow-hint,
+  #btnFit,
+  .quick-actions,
+  .toast,
+  .sheet {
+    display: none !important;
+  }
+
+  .app,
+  .workspace,
+  .preview-pane,
+  .paper-wrap {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .paper {
+    width: 210mm !important;
+    min-height: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+  }
+
+  .r-section,
+  .r-entry {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 照片不能被分页切开 */
+  .r-photo,
+  .r-head {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+}
