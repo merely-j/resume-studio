@@ -27,6 +27,9 @@
     renderResume,
     loadState,
     saveState,
+    syncEnglish,
+    localizedResume,
+    countMissingEnglish,
   } = RS;
 
   const MM_TO_PX = 96 / 25.4;
@@ -55,14 +58,34 @@
     btnRedo: document.getElementById('btnRedo'),
     btnQuickView: document.getElementById('btnQuickView'),
     btnQuickExport: document.getElementById('btnQuickExport'),
+    langZh: document.getElementById('btnLangZh'),
+    langEn: document.getElementById('btnLangEn'),
+    noticeBar: document.getElementById('noticeBar'),
+    noticeText: document.getElementById('noticeText'),
+    btnBatchTranslate: document.getElementById('btnBatchTranslate'),
+    btnTranslateSettings: document.getElementById('btnTranslateSettings'),
+    settingsDialog: document.getElementById('translateDialog'),
+    providerSelect: document.getElementById('providerSelect'),
+    baseUrlInput: document.getElementById('baseUrlInput'),
+    modelInput: document.getElementById('modelInput'),
+    apiKeyInput: document.getElementById('apiKeyInput'),
+    btnTestApi: document.getElementById('btnTestApi'),
+    testResult: document.getElementById('testResult'),
+    exportDialog: document.getElementById('exportDialog'),
+    exportZh: document.getElementById('exportZh'),
+    exportEn: document.getElementById('exportEn'),
+    exportEnCount: document.getElementById('exportEnCount'),
+    btnExportConfirm: document.getElementById('btnExportConfirm'),
     toast: document.getElementById('toast'),
   };
 
   let state = loadState();
+  if (state.lang !== 'en') state.lang = 'zh';
   let saveTimer = null;
   let saveFailed = false;
   let previewFrame = null;
   let fontsChecked = false;
+  let englishMissing = 0;
 
   const escHtml = (value) =>
     String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => {
@@ -93,7 +116,8 @@
 
   function renderPreview() {
     const resume = activeResume();
-    el.paper.innerHTML = renderResume(resume);
+    // 英文模式下渲染的是"英文镜像"，结构沿用中文、文案取英文
+    el.paper.innerHTML = renderResume(localizedResume(resume, state.lang));
     el.docName.textContent = resume.title || '未命名简历';
     document.title = (resume.title || '我的简历') + ' · 简历工坊';
     if (el.fontSizeInput && document.activeElement !== el.fontSizeInput) {
@@ -106,6 +130,16 @@
     el.paper.style.setProperty('--gap', String(resume.sectionGap == null ? 13 : resume.sectionGap));
     applyLayout(resume);
     syncFitButton(resume);
+    syncLangUi(resume);
+
+    // 英文版还是空的：给一句提示，别让人对着一张白纸
+    if (state.lang === 'en' && !el.paper.querySelector('.r-section')) {
+      const hint = document.createElement('p');
+      hint.className = 'r-empty-hint';
+      hint.textContent = '英文版还没有内容：点上方「批量翻译」，或直接在左侧填写英文。';
+      el.paper.appendChild(hint);
+    }
+
     checkOverflow();
     fitPaper();
 
@@ -210,7 +244,7 @@
 
   function paintEditor(options) {
     const o = options || {};
-    renderEditor(el.editor, activeResume());
+    renderEditor(el.editor, activeResume(), state.lang);
     if (o.focusSelector) {
       const target = el.editor.querySelector(o.focusSelector);
       if (target) {
@@ -219,6 +253,41 @@
       }
     }
     el.docName.textContent = activeResume().title || '未命名简历';
+  }
+
+  /* ---------------------------- 语言切换 ---------------------------- */
+
+  function setLang(lang) {
+    const next = lang === 'en' ? 'en' : 'zh';
+    if (state.lang === next) return;
+    state.lang = next;
+    syncEnglish(activeResume());
+    paintEditor();
+    renderPreview();
+    persist();
+    el.editor.scrollTop = 0;
+  }
+
+  /** 顶部语言开关 + 待翻译提示条 */
+  function syncLangUi(resume) {
+    const isEn = state.lang === 'en';
+    if (el.langZh) el.langZh.setAttribute('aria-pressed', String(!isEn));
+    if (el.langEn) el.langEn.setAttribute('aria-pressed', String(isEn));
+    document.body.dataset.lang = state.lang;
+
+    englishMissing = isEn ? countMissingEnglish(resume) : 0;
+    if (el.noticeBar) {
+      if (isEn && englishMissing > 0) {
+        el.noticeText.innerHTML = '英文版还有 <b>' + englishMissing + '</b> 处未翻译';
+        el.noticeBar.hidden = false;
+      } else {
+        el.noticeBar.hidden = true;
+      }
+    }
+    if (el.exportEnCount) {
+      const missing = countMissingEnglish(resume);
+      el.exportEnCount.textContent = missing ? missing + ' 处待翻译' : '已完成';
+    }
   }
 
   /* ---------------------------- 数据操作 ---------------------------- */
@@ -243,18 +312,20 @@
     return (activeResume().customSections || []).find((s) => s.id === sectionId);
   }
 
-  function listOf(section) {
+  function listOf(section, scope) {
     const resume = activeResume();
+    // 英文模式下改的是 resume.en 里的镜像数组
+    const root = scope === 'en' ? syncEnglish(resume) : resume;
     if (section.indexOf('custom:') === 0) {
-      const custom = findCustom(section.slice(7));
+      const custom = (root.customSections || []).find((s) => s.id === section.slice(7));
       return custom ? custom.items : null;
     }
-    return resume[section];
+    return root[section];
   }
 
-  function setField(section, id, name, value) {
+  function setField(section, id, name, value, scope) {
     const resume = activeResume();
-    const list = listOf(section);
+    const list = listOf(section, scope);
     if (!list) return;
     const item = list.find((it) => it.id === id);
     if (!item) return;
@@ -289,6 +360,355 @@
       if (head) head.textContent = value || '自定义模块';
       const rowName = el.editor.querySelector('[data-order-id="' + sectionId + '"] .order-name');
       if (rowName) rowName.textContent = value || '自定义模块';
+    }
+  }
+
+  /** 英文技能 / 证书这类"每行一条"的列表 */
+  function setListLines(path, text) {
+    const resume = activeResume();
+    syncEnglish(resume);
+    const list = String(text == null ? '' : text)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const keys = path.split('.');
+    let node = resume;
+    for (let i = 0; i < keys.length - 1; i += 1) {
+      if (typeof node[keys[i]] !== 'object' || node[keys[i]] === null) node[keys[i]] = {};
+      node = node[keys[i]];
+    }
+    node[keys[keys.length - 1]] = list;
+    touch(resume);
+    persist();
+    schedulePreview();
+  }
+
+  /** 英文版"证书 / 语言"：每行一条，转成 extras 结构 */
+  function setExtrasLines(path, text) {
+    const resume = activeResume();
+    const en = syncEnglish(resume);
+    const lines = String(text == null ? '' : text)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const existing = en.extras || [];
+    en.extras = lines.map((line, i) => {
+      const base = existing[i] || {};
+      return {
+        id: base.id || 'x' + Date.now().toString(36) + i,
+        label: '',
+        value: line,
+      };
+    });
+    touch(resume);
+    persist();
+    schedulePreview();
+  }
+
+  /* ---------------------------- 翻译（用户自带 API Key） ---------------------------- */
+
+  /** 预设服务商：都走 OpenAI 兼容的 /chat/completions */
+  const PROVIDERS = [
+    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    { id: 'moonshot', name: '月之暗面 Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+    {
+      id: 'qwen',
+      name: '通义千问',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      model: 'qwen-plus',
+    },
+    { id: 'zhipu', name: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    { id: 'custom', name: '自定义（OpenAI 兼容）', baseUrl: '', model: '' },
+  ];
+
+  const SETTINGS_KEY = 'resume-app.translate.v1';
+
+  function loadTranslateSettings() {
+    try {
+      return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function saveTranslateSettings(settings) {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (err) {
+      /* 隐私模式下写不进去，忽略 */
+    }
+  }
+
+  let translateSettings = loadTranslateSettings();
+  let translating = false;
+
+  const hasApiConfig = () =>
+    Boolean(translateSettings.apiKey && translateSettings.baseUrl && translateSettings.model);
+
+  /** 调一次 OpenAI 兼容的 chat/completions */
+  async function callChat(messages, options) {
+    const opts = options || {};
+    const base = String(translateSettings.baseUrl || '').replace(/\/+$/, '');
+    const url = base + '/chat/completions';
+    const body = {
+      model: translateSettings.model,
+      temperature: opts.temperature == null ? 0.2 : opts.temperature,
+      messages: messages,
+    };
+    if (opts.json) body.response_format = { type: 'json_object' };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + translateSettings.apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error('接口返回 ' + res.status + (text ? '：' + text.slice(0, 160) : ''));
+    }
+    const data = await res.json();
+    const content =
+      data && data.choices && data.choices[0] && data.choices[0].message
+        ? data.choices[0].message.content
+        : '';
+    return String(content || '');
+  }
+
+  /** 去掉富文本标签，翻译只送纯文本 */
+  const plainText = (value) =>
+    String(value == null ? '' : value)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .trim();
+
+  /** 收集"需要翻译"的字段（key 里带 id，方便写回） */
+  function collectTranslatable(resume) {
+    const fields = [];
+    const b = resume.basics || {};
+    ['name', 'headline', 'city', 'website', 'summary'].forEach((key) => {
+      const text = plainText(b[key]);
+      if (text) fields.push({ key: 'basics.' + key, text: text });
+    });
+
+    (resume.experience || []).forEach((item) => {
+      if (plainText(item.company)) fields.push({ key: 'experience:' + item.id + ':company', text: plainText(item.company) });
+      if (plainText(item.role)) fields.push({ key: 'experience:' + item.id + ':role', text: plainText(item.role) });
+      if (plainText(item.desc)) fields.push({ key: 'experience:' + item.id + ':desc', text: plainText(item.desc) });
+    });
+    (resume.projects || []).forEach((item) => {
+      if (plainText(item.name)) fields.push({ key: 'projects:' + item.id + ':name', text: plainText(item.name) });
+      if (plainText(item.role)) fields.push({ key: 'projects:' + item.id + ':role', text: plainText(item.role) });
+      if (plainText(item.desc)) fields.push({ key: 'projects:' + item.id + ':desc', text: plainText(item.desc) });
+    });
+    (resume.education || []).forEach((item) => {
+      if (plainText(item.school)) fields.push({ key: 'education:' + item.id + ':school', text: plainText(item.school) });
+      if (plainText(item.major)) fields.push({ key: 'education:' + item.id + ':major', text: plainText(item.major) });
+      if (plainText(item.degree)) fields.push({ key: 'education:' + item.id + ':degree', text: plainText(item.degree) });
+      if (plainText(item.desc)) fields.push({ key: 'education:' + item.id + ':desc', text: plainText(item.desc) });
+    });
+
+    const skills = (resume.skills || []).filter(Boolean);
+    if (skills.length) fields.push({ key: 'skills', text: skills.join(' / ') });
+
+    (resume.customSections || []).forEach((custom) => {
+      (custom.items || []).forEach((item) => {
+        const prefix = 'custom:' + custom.id + ':' + item.id + ':';
+        ['name', 'role', 'desc'].forEach((f) => {
+          if (plainText(item[f])) fields.push({ key: prefix + f, text: plainText(item[f]) });
+        });
+      });
+    });
+    return fields;
+  }
+
+  /** 把一条翻译写回英文镜像 */
+  function applyTranslation(key, value) {
+    const resume = activeResume();
+    const en = syncEnglish(resume);
+    if (!value) return;
+
+    if (key === 'skills') {
+      en.skills = String(value)
+        .split(/\s*\/\s*/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return;
+    }
+    if (key.indexOf('basics.') === 0) {
+      en.basics[key.slice(7)] = value;
+      return;
+    }
+    const parts = key.split(':');
+    if (parts[0] === 'custom:') {
+      const custom = (en.customSections || []).find((c) => c.id === parts[1]);
+      const item = custom && (custom.items || []).find((it) => it.id === parts[2]);
+      if (item) item[parts[3]] = value;
+      return;
+    }
+    const list = en[parts[0]] || [];
+    const item = list.find((it) => it.id === parts[1]);
+    if (item) item[parts[2]] = value;
+  }
+
+  /** 按约 1200 字切批，避免单次请求过长 */
+  function chunkFields(fields) {
+    const batches = [];
+    let current = [];
+    let size = 0;
+    fields.forEach((field) => {
+      const len = field.text.length + 20;
+      if (current.length && size + len > 1200) {
+        batches.push(current);
+        current = [];
+        size = 0;
+      }
+      current.push(field);
+      size += len;
+    });
+    if (current.length) batches.push(current);
+    return batches;
+  }
+
+  /** 翻译一批：只发 id + 原文，要求返回 JSON */
+  async function translateBatch(batch) {
+    const payload = batch.map((field) => ({ id: field.key, text: field.text }));
+    const prompt = [
+      '把下面每条中文内容翻译成简洁、专业的英文简历用语。',
+      '要求：保留数字与指标；公司名、学校名、项目名保留中文原文并在括号内给英文；不要添加原文没有的信息；',
+      '输出严格的 JSON 对象：{"items":[{"id":"原 id","en":"英文"}]}，不要包含其他文字。',
+      '',
+      JSON.stringify(payload),
+    ].join('\n');
+
+    const content = await callChat(
+      [
+        { role: 'system', content: '你是专业的英文简历译者，只输出 JSON。' },
+        { role: 'user', content: prompt },
+      ],
+      { json: true }
+    );
+
+    const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (err) {
+      throw new Error('返回内容不是合法 JSON');
+    }
+    const items = Array.isArray(parsed) ? parsed : parsed.items || parsed.data || [];
+    if (!Array.isArray(items) || !items.length) throw new Error('返回里没有翻译结果');
+    items.forEach((item) => applyTranslation(String(item.id || ''), String(item.en || '')));
+
+    // 翻译结果是数据，必须落盘，否则刷新页面就丢了
+    touch(activeResume());
+    persist();
+  }
+
+  /** 批量翻译：整份简历（跳过已经翻译过的） */
+  async function translateAll() {
+    if (translating) return;
+    if (!hasApiConfig()) {
+      openTranslateSettings();
+      toast('先填写翻译服务的 API Key');
+      return;
+    }
+    const resume = activeResume();
+    const fields = collectTranslatable(resume);
+    if (!fields.length) {
+      toast('中文版还没有可翻译的内容');
+      return;
+    }
+
+    translating = true;
+    const batches = chunkFields(fields);
+    try {
+      for (let i = 0; i < batches.length; i += 1) {
+        if (el.noticeText) {
+          el.noticeText.innerHTML = '正在翻译 ' + (i + 1) + ' / ' + batches.length + ' 批…';
+        }
+        // 串行请求：并发容易被服务商限流，而且进度看不清
+        await translateBatch(batches[i]);
+        renderPreview();
+      }
+      toast('翻译完成，英文内容可以逐条修改');
+    } catch (err) {
+      console.error(err);
+      toast('翻译失败：' + err.message);
+    } finally {
+      translating = false;
+      syncLangUi(activeResume());
+      renderPreview();
+    }
+  }
+
+  /** 只翻译某一条经历 */
+  async function translateItem(section, id) {
+    if (translating) return;
+    if (!hasApiConfig()) {
+      openTranslateSettings();
+      toast('先填写翻译服务的 API Key');
+      return;
+    }
+    const resume = activeResume();
+    const fields = collectTranslatable(resume).filter((field) => field.key.indexOf(':' + id + ':') !== -1);
+    if (!fields.length) {
+      toast('这一条没有可翻译的文字');
+      return;
+    }
+    translating = true;
+    try {
+      await translateBatch(fields);
+      paintEditor();
+      renderPreview();
+      toast('这一条翻译好了');
+    } catch (err) {
+      console.error(err);
+      toast('翻译失败：' + err.message);
+    } finally {
+      translating = false;
+    }
+  }
+
+  function openTranslateSettings() {
+    const provider = PROVIDERS.find((p) => p.id === translateSettings.provider) || PROVIDERS[0];
+    el.providerSelect.value = provider.id;
+    el.baseUrlInput.value = translateSettings.baseUrl || provider.baseUrl;
+    el.modelInput.value = translateSettings.model || provider.model;
+    el.apiKeyInput.value = translateSettings.apiKey || '';
+    el.testResult.textContent = '';
+    el.settingsDialog.showModal();
+  }
+
+  function readSettingsFromDialog() {
+    return {
+      provider: el.providerSelect.value,
+      baseUrl: el.baseUrlInput.value.trim(),
+      model: el.modelInput.value.trim(),
+      apiKey: el.apiKeyInput.value.trim(),
+    };
+  }
+
+  async function testConnection() {
+    const candidate = readSettingsFromDialog();
+    if (!candidate.apiKey || !candidate.baseUrl || !candidate.model) {
+      el.testResult.textContent = '请先填完地址、模型和 Key';
+      return;
+    }
+    const previous = translateSettings;
+    translateSettings = candidate;
+    el.testResult.textContent = '测试中…';
+    try {
+      const content = await callChat([{ role: 'user', content: '回复两个字：正常' }], { temperature: 0 });
+      el.testResult.textContent = '✅ 连接正常' + (content ? '：' + content.slice(0, 20) : '');
+    } catch (err) {
+      el.testResult.textContent = '❌ ' + err.message;
+    } finally {
+      translateSettings = previous;
     }
   }
 
@@ -707,10 +1127,19 @@
     return (text || '我的简历').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
   }
 
-  function exportPdf() {
+  function exportPdf(lang) {
+    const target = lang === 'en' ? 'en' : 'zh';
     const resume = activeResume();
-    const filename = safeName(resume.title);
+    const filename = safeName(resume.title) + (target === 'en' ? '-EN' : '-中文');
     const previousTitle = document.title;
+    const previousLang = state.lang;
+
+    // 打印的是"当前预览"，所以先切到要导出的语言
+    if (state.lang !== target) {
+      state.lang = target;
+      paintEditor();
+      renderPreview();
+    }
 
     // 浏览器打印时，"另存为 PDF"的默认文件名取自 document.title，
     // 所以打印前临时把标题换成简历名，打完再换回来。
@@ -718,18 +1147,44 @@
     toast('文件名默认是「' + filename + '」，在打印窗口选「另存为 PDF」');
 
     let restored = false;
-    const restoreTitle = () => {
+    const restore = () => {
       if (restored) return;
       restored = true;
       document.title = previousTitle;
-      window.removeEventListener('afterprint', restoreTitle);
+      window.removeEventListener('afterprint', restore);
+      if (state.lang !== previousLang) {
+        state.lang = previousLang;
+        paintEditor();
+        renderPreview();
+      }
     };
-    window.addEventListener('afterprint', restoreTitle);
+    window.addEventListener('afterprint', restore);
     // 兜底：某些环境下 afterprint 不触发
-    setTimeout(restoreTitle, 60000);
+    setTimeout(restore, 60000);
 
     // 等 toast 画出来再调起打印，否则部分浏览器会吞掉提示
     setTimeout(() => window.print(), 250);
+  }
+
+  /** 导出前先问：中文版还是英文版 */
+  function openExportDialog() {
+    syncLangUi(activeResume());
+    const isEn = state.lang === 'en';
+    el.exportEn.checked = isEn;
+    el.exportZh.checked = !isEn;
+    el.exportDialog.showModal();
+  }
+
+  function confirmExport() {
+    const lang = el.exportEn.checked ? 'en' : 'zh';
+    if (lang === 'en') {
+      const missing = countMissingEnglish(activeResume());
+      if (missing > 0) {
+        toast('英文版还有 ' + missing + ' 处没翻译，会以空内容导出');
+      }
+    }
+    el.exportDialog.close();
+    exportPdf(lang);
   }
 
   /* ---------------------------- 站内确认框 ---------------------------- */
@@ -778,6 +1233,22 @@
       el.btnQuickView.textContent = view === 'preview' ? '继续编辑' : '看预览';
     }
     if (view === 'preview') requestAnimationFrame(fitPaper);
+  }
+
+  /** 预览区点某个模块 → 跳到左侧对应卡片，展开并聚焦第一个输入框 */
+  function jumpToSection(target) {
+    if (!target) return;
+    const cardKey = target.indexOf('custom:') === 0 ? 'custom_' + target.slice(7) : target;
+    if (document.body.dataset.view === 'preview') setView('edit');
+    const card = el.editor.querySelector('[data-card="' + cardKey + '"]');
+    if (!card) return;
+    if (card.tagName === 'DETAILS') card.open = true;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('is-flash');
+    void card.offsetWidth;
+    card.classList.add('is-flash');
+    const field = card.querySelector('input, textarea, [contenteditable="true"]');
+    if (field) setTimeout(() => field.focus({ preventScroll: true }), 380);
   }
 
   function openDialog() {
@@ -881,6 +1352,9 @@
       addCustomSection: withHistory(addCustomSection),
       removeCustomSection: withHistory(removeCustomSection),
       setSectionTitle: withHistory(setSectionTitle),
+      setListLines: withHistory(setListLines),
+      setExtrasLines: withHistory(setExtrasLines),
+      translateItem: translateItem,
       refreshEditor: paintEditor,
     });
 
@@ -895,7 +1369,7 @@
         setView(document.body.dataset.view === 'preview' ? 'edit' : 'preview');
       });
     }
-    if (el.btnQuickExport) el.btnQuickExport.addEventListener('click', exportPdf);
+    if (el.btnQuickExport) el.btnQuickExport.addEventListener('click', openExportDialog);
 
     // 移动端 编辑 / 预览 切换
     document.querySelectorAll('[data-view-btn]').forEach((btn) => {
@@ -903,7 +1377,7 @@
     });
 
     document.getElementById('btnResumes').addEventListener('click', openDialog);
-    document.getElementById('btnExportPdf').addEventListener('click', exportPdf);
+    document.getElementById('btnExportPdf').addEventListener('click', openExportDialog);
     document.getElementById('btnCloseDialog').addEventListener('click', closeDialog);
     document.getElementById('btnCreateResume').addEventListener('click', createResume);
 
@@ -929,6 +1403,62 @@
     });
     el.confirmDialog.addEventListener('click', (event) => {
       if (event.target === el.confirmDialog) settleConfirm(false);
+    });
+
+    /* ---------- 中英切换 ---------- */
+    if (el.langZh) el.langZh.addEventListener('click', () => setLang('zh'));
+    if (el.langEn) el.langEn.addEventListener('click', () => setLang('en'));
+    if (el.btnBatchTranslate) el.btnBatchTranslate.addEventListener('click', translateAll);
+
+    /* ---------- 翻译设置 ---------- */
+    el.providerSelect.innerHTML = PROVIDERS.map(
+      (p) => '<option value="' + p.id + '">' + p.name + '</option>'
+    ).join('');
+    if (el.btnTranslateSettings) el.btnTranslateSettings.addEventListener('click', openTranslateSettings);
+    el.providerSelect.addEventListener('change', () => {
+      const provider = PROVIDERS.find((p) => p.id === el.providerSelect.value);
+      if (provider && provider.id !== 'custom') {
+        el.baseUrlInput.value = provider.baseUrl;
+        el.modelInput.value = provider.model;
+      }
+    });
+    el.btnTestApi.addEventListener('click', testConnection);
+    document.getElementById('btnTranslateSave').addEventListener('click', () => {
+      translateSettings = readSettingsFromDialog();
+      saveTranslateSettings(translateSettings);
+      el.settingsDialog.close();
+      toast('翻译设置已保存');
+    });
+    document.querySelectorAll('[data-close-translate]').forEach((btn) => {
+      btn.addEventListener('click', () => el.settingsDialog.close());
+    });
+
+    /* ---------- 导出 ---------- */
+    el.btnExportConfirm.addEventListener('click', confirmExport);
+    el.exportDialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      el.exportDialog.close();
+    });
+    document.querySelectorAll('[data-close-export]').forEach((btn) => {
+      btn.addEventListener('click', () => el.exportDialog.close());
+    });
+
+    /* ---------- 预览区：悬停出虚框、点击跳回左侧 ---------- */
+    el.paper.addEventListener('mouseover', (event) => {
+      const section = event.target.closest('[data-target]');
+      if (!section || !el.paper.contains(section)) return;
+      el.paper.querySelectorAll('[data-target].is-hover').forEach((s) => {
+        if (s !== section) s.classList.remove('is-hover');
+      });
+      section.classList.add('is-hover');
+    });
+    el.paper.addEventListener('mouseleave', () => {
+      el.paper.querySelectorAll('[data-target].is-hover').forEach((s) => s.classList.remove('is-hover'));
+    });
+    el.paper.addEventListener('click', (event) => {
+      const section = event.target.closest('[data-target]');
+      if (!section || !el.paper.contains(section)) return;
+      jumpToSection(section.dataset.target);
     });
 
     // 点击对话框背景关闭

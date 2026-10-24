@@ -280,10 +280,19 @@
    * 自定义模块也在顺序数组里，统一由 renderSection 分发。
    * ids 用于双栏模板：只取属于某一列的那几个模块，但顺序仍按全局设定。
    */
+  /** 给模块打上标记：预览区悬停出虚框、点击跳回左侧对应卡片 */
+  function markSection(resume, id, html) {
+    if (!html) return '';
+    return html.replace(
+      '<section class="r-section">',
+      `<section class="r-section" data-target="${esc(id)}" data-label="${esc(sectionTitle(resume, id))}">`
+    );
+  }
+
   function orderedSections(resume, ids) {
     const order = normalizeSectionOrder(resume);
     const list = Array.isArray(ids) ? order.filter((id) => ids.indexOf(id) !== -1) : order;
-    return list.map((id) => renderSection(resume, id)).join('');
+    return list.map((id) => markSection(resume, id, renderSection(resume, id))).join('');
   }
 
   function classicTemplate(resume) {
@@ -314,9 +323,9 @@
       const skills = (resume.skills || []).filter(has);
       const certs = (resume.extras || []).filter((item) => has(item.label) || has(item.value));
       if (!skills.length && !certs.length) return '';
-      return `<div class="r-side-block"><h2 class="r-side-title">${esc(
+      return `<div class="r-side-block" data-target="skills" data-label="${esc(
         sectionTitle(resume, 'skills')
-      )}</h2>
+      )}"><h2 class="r-side-title">${esc(sectionTitle(resume, 'skills'))}</h2>
         ${
           skills.length
             ? `<ul class="r-side-list r-side-list--plain">${skills
@@ -344,7 +353,7 @@
     // 侧栏只放教育经历和技能证书，其余（含自定义模块）都放主栏；
     // 两栏各自按用户设定的全局顺序排列。
     const sideRenderers = {
-      education: () => educationHtml(resume),
+      education: () => markSection(resume, 'education', educationHtml(resume)),
       skills: () => skillsBlock,
     };
     const order = normalizeSectionOrder(resume);
@@ -354,7 +363,7 @@
       .join('');
     const mainOrdered = order
       .filter((id) => !sideRenderers[id])
-      .map((id) => renderSection(resume, id))
+      .map((id) => markSection(resume, id, renderSection(resume, id)))
       .join('');
 
     return `

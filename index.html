@@ -68,21 +68,28 @@
       </header>
 
       <div class="toolbar">
-        <div class="segmented" role="tablist" aria-label="切换编辑与预览">
-          <button class="segmented-btn is-active" data-view-btn="edit" role="tab" aria-selected="true" type="button">
-            编辑
-          </button>
-          <button class="segmented-btn" data-view-btn="preview" role="tab" aria-selected="false" type="button">
-            预览
-          </button>
-        </div>
-        <div class="history-btns">
-          <button class="icon-btn" id="btnUndo" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销" disabled>
-            ↶
-          </button>
-          <button class="icon-btn" id="btnRedo" type="button" title="恢复 (Ctrl+Shift+Z)" aria-label="恢复" disabled>
-            ↷
-          </button>
+        <div class="toolbar-left">
+          <div class="segmented" role="tablist" aria-label="切换编辑与预览">
+            <button class="segmented-btn is-active" data-view-btn="edit" role="tab" aria-selected="true" type="button">
+              编辑
+            </button>
+            <button class="segmented-btn" data-view-btn="preview" role="tab" aria-selected="false" type="button">
+              预览
+            </button>
+          </div>
+          <div class="history-btns">
+            <button class="icon-btn" id="btnUndo" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销" disabled>
+              ↶
+            </button>
+            <button class="icon-btn" id="btnRedo" type="button" title="恢复 (Ctrl+Shift+Z)" aria-label="恢复" disabled>
+              ↷
+            </button>
+          </div>
+          <div class="lang-switch" role="group" aria-label="切换简历语言">
+            <button type="button" id="btnLangZh" data-lang="zh" aria-pressed="true">中文</button>
+            <button type="button" id="btnLangEn" data-lang="en" aria-pressed="false">English</button>
+          </div>
+          <button class="btn btn-sm btn-ghost" id="btnTranslateSettings" type="button">🌐 翻译设置</button>
         </div>
         <div class="toolbar-selects">
           <label class="tpl-select">
@@ -110,6 +117,13 @@
             </span>
           </label>
         </div>
+      </div>
+
+      <!-- 英文版待翻译提示条：只在英文模式下、且还有没翻译的内容时出现 -->
+      <div class="notice-bar" id="noticeBar" hidden>
+        <span class="notice-icon" aria-hidden="true">⚠️</span>
+        <span class="notice-text" id="noticeText"></span>
+        <button class="btn btn-sm btn-primary" id="btnBatchTranslate" type="button">批量翻译</button>
       </div>
 
       <main class="workspace">
@@ -151,6 +165,70 @@
       <div class="sheet-foot">
         <button class="btn btn-ghost" id="btnConfirmCancel" type="button">取消</button>
         <button class="btn btn-danger" id="btnConfirmOk" type="button">确定删除</button>
+      </div>
+    </dialog>
+
+    <!-- 翻译设置：用户自己的 API Key，只存本机 -->
+    <dialog class="sheet" id="translateDialog" aria-label="翻译设置">
+      <div class="sheet-head">
+        <h2>翻译设置</h2>
+        <button class="icon-btn" type="button" data-close-translate aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <label class="field">
+          <span class="field-label">服务商</span>
+          <select class="input" id="providerSelect"></select>
+        </label>
+        <label class="field">
+          <span class="field-label">接口地址（OpenAI 兼容）</span>
+          <input class="input" id="baseUrlInput" placeholder="https://api.deepseek.com/v1" />
+        </label>
+        <label class="field">
+          <span class="field-label">模型</span>
+          <input class="input" id="modelInput" placeholder="deepseek-chat" />
+        </label>
+        <label class="field">
+          <span class="field-label">API Key</span>
+          <input class="input" id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+        </label>
+        <p class="hint">Key 只保存在这台设备的浏览器里，不会上传到任何服务器。建议使用自己的 Key 并设置额度上限。</p>
+        <div class="inline-row">
+          <button class="btn btn-ghost btn-sm" id="btnTestApi" type="button">测试连接</button>
+          <span class="hint" id="testResult"></span>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" type="button" data-close-translate>取消</button>
+        <button class="btn btn-primary" id="btnTranslateSave" type="button">保存</button>
+      </div>
+    </dialog>
+
+    <!-- 导出：中文版 / 英文版 各自一份 -->
+    <dialog class="sheet" id="exportDialog" aria-label="导出 PDF">
+      <div class="sheet-head">
+        <h2>导出 PDF</h2>
+        <button class="icon-btn" type="button" data-close-export aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <label class="radio-row">
+          <input type="radio" name="exportLang" id="exportZh" value="zh" checked />
+          <span>
+            <b>中文版</b>
+            <em>文件名带「-中文」</em>
+          </span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="exportLang" id="exportEn" value="en" />
+          <span>
+            <b>英文版</b>
+            <em id="exportEnCount">—</em>
+          </span>
+        </label>
+        <p class="hint">每次导出一份；中文和英文是两份独立的简历。</p>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" type="button" data-close-export>取消</button>
+        <button class="btn btn-primary" id="btnExportConfirm" type="button">导出</button>
       </div>
     </dialog>
 

@@ -50,12 +50,23 @@
       : o.bind
       ? `data-bind="${o.bind}"`
       : `data-section="${o.section}" data-id="${o.id}" data-field="${o.name}"`;
+    const scope = o.scope ? ` data-scope="${o.scope}"` : '';
     return `
     <label class="field"${o.span === 2 ? ' data-span="2"' : ''}>
-      <span class="field-label">${esc(o.label)}</span>
+      <span class="field-label">${esc(o.label)}${o.hint || ''}</span>
       <input class="input" type="${o.type || 'text'}" value="${esc(o.value)}"
-             placeholder="${esc(o.placeholder || '')}" ${dataAttrs} />
+             placeholder="${esc(o.placeholder || '')}"${scope} ${dataAttrs} />
     </label>`;
+  }
+
+  /** 英文模式下字段旁的小字中文原文（超长由 CSS 省略） */
+  function srcHint(text) {
+    const plain = String(text == null ? '' : text)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!plain) return '';
+    return `<span class="src-hint" title="${esc(plain)}">← ${esc(plain)}</span>`;
   }
 
   /**
@@ -71,9 +82,10 @@
     const dataAttrs = o.bind
       ? `data-bind="${o.bind}"`
       : `data-section="${o.section}" data-id="${o.id}" data-field="${o.name}"`;
+    const scope = o.scope ? ` data-scope="${o.scope}"` : '';
     return `
     <div class="field" data-span="2">
-      <span class="field-label">${esc(o.label)}</span>
+      <span class="field-label">${esc(o.label)}${o.hint || ''}</span>
       <div class="rich" data-rich-wrap>
         <div class="rich-toolbar">
           <button type="button" class="rich-btn" data-cmd="bold" title="加粗" aria-label="加粗"><b>B</b></button>
@@ -81,7 +93,7 @@
           <button type="button" class="rich-btn" data-cmd="underline" title="下划线" aria-label="下划线"><u>U</u></button>
         </div>
         <div class="rich-input" contenteditable="true" role="textbox" aria-multiline="true"
-             data-rich ${dataAttrs}
+             data-rich ${dataAttrs}${scope}
              data-placeholder="${esc(o.placeholder || '')}">${toEditable(o.value)}</div>
       </div>
     </div>`;
@@ -591,8 +603,214 @@
   }
 
   /** 渲染整个编辑器 */
-  function renderEditor(root, resume) {
+  /* ---------------------------- 英文版编辑器 ---------------------------- */
+
+  /** 英文版：基本信息（联系方式与中文共用） */
+  function enBasicsCard(resume) {
+    const en = RS.syncEnglish(resume) || {};
+    const b = en.basics || {};
+    const zh = resume.basics || {};
+    const contact = [zh.phone, zh.email, zh.city].filter(Boolean).join(' · ');
+    const body = `
+    <div class="grid">
+      ${field({
+        label: 'Name',
+        value: b.name,
+        bind: 'en.basics.name',
+        placeholder: 'Xiao Chen',
+        hint: srcHint(zh.name),
+      })}
+      ${field({
+        label: 'Headline',
+        value: b.headline,
+        bind: 'en.basics.headline',
+        placeholder: 'Senior Product Manager · 3 years in B2B SaaS',
+        hint: srcHint(zh.headline),
+      })}
+      ${field({
+        label: 'City',
+        value: b.city,
+        bind: 'en.basics.city',
+        placeholder: 'Hangzhou, China',
+        hint: srcHint(zh.city),
+      })}
+      ${field({
+        label: 'Website',
+        value: b.website,
+        bind: 'en.basics.website',
+        placeholder: 'github.com/yourname',
+        hint: srcHint(zh.website),
+      })}
+    </div>
+    ${richField({
+      label: 'Summary',
+      value: b.summary,
+      bind: 'en.basics.summary',
+      placeholder: 'Product manager with 3 years in B2B SaaS…',
+      hint: srcHint(zh.summary),
+    })}
+    <p class="form-sub">联系方式（与中文版共用）</p>
+    <p class="en-shared">${esc(contact || '尚未填写手机号 / 邮箱')}</p>`;
+    return card({ key: 'basics', title: '基本信息', hint: 'English', body });
+  }
+
+  /** 英文版：列表型模块（经历 / 项目 / 教育） */
+  function enListCard(resume, meta) {
+    const en = RS.syncEnglish(resume) || {};
+    const titles = en.sectionTitles || {};
+    const zhItems = resume[meta.key] || [];
+    const enItems = en[meta.key] || [];
+
+    const titleField = field({
+      label: '模块标题（英文）',
+      bind: 'en.sectionTitles.' + meta.key,
+      value: titles[meta.key] || '',
+      placeholder: RS.EN_SECTION_TITLES[meta.key] || meta.title,
+      span: 2,
+    });
+
+    const items = zhItems
+      .map((zhItem) => {
+        const item = enItems.find((it) => it.id === zhItem.id) || { id: zhItem.id };
+        const body = meta.fields
+          .map((f) => {
+            const opts = {
+              label: RS.EN_LABELS[f.name] || f.label,
+              value: item[f.name] || '',
+              hint: srcHint(zhItem[f.name]),
+              section: meta.key,
+              id: item.id,
+              name: f.name,
+              scope: 'en',
+              span: f.span || 1,
+            };
+            if (f.type === 'textarea') {
+              return richField(Object.assign(opts, { placeholder: '每行一条，自动变项目符号' }));
+            }
+            return field(opts);
+          })
+          .join('');
+        const label = meta.labelOf(item) || meta.labelOf(zhItem) || '新条目';
+        return `
+        <div class="item" data-item="${item.id}">
+          <div class="item-bar">
+            <span class="item-title">${esc(label)}</span>
+            <span class="item-tools">
+              <button class="icon-btn" data-action="translate-item" data-section="${meta.key}"
+                      data-id="${item.id}" title="翻译这一条" aria-label="翻译这一条">译</button>
+            </span>
+          </div>
+          <div class="grid">${body}</div>
+        </div>`;
+      })
+      .join('');
+
+    return card({
+      key: meta.key,
+      title: meta.title,
+      hint: 'English',
+      count: zhItems.length || undefined,
+      body: `<div class="grid">${titleField}</div>${
+        items || '<p class="empty-hint">中文版这一块还没有内容，先到中文版添加。</p>'
+      }`,
+    });
+  }
+
+  /** 英文版：技能与证书（英文版是独立的字符串列表） */
+  function enSkillsCard(resume) {
+    const en = RS.syncEnglish(resume) || {};
+    const titles = en.sectionTitles || {};
+    const lines = (arr) => (arr || []).join('\n');
+    const zhSkills = (resume.skills || []).join(' / ');
+    const body = `
+    <div class="grid">
+      ${field({
+        label: '模块标题（英文）',
+        bind: 'en.sectionTitles.skills',
+        value: titles.skills || '',
+        placeholder: RS.EN_SECTION_TITLES.skills,
+        span: 2,
+      })}
+    </div>
+    <div class="field" data-span="2">
+      <span class="field-label">技能（每行一个）${srcHint(zhSkills)}</span>
+      <textarea class="textarea" rows="3" data-list-lines="en.skills"
+                placeholder="Figma&#10;SQL">${esc(lines(en.skills))}</textarea>
+    </div>
+    <div class="field" data-span="2">
+      <span class="field-label">证书 / 语言（每行一条，显示在技能下面）</span>
+      <textarea class="textarea" rows="3" data-extras-lines="en.extras"
+                placeholder="PMP (2023)&#10;English — professional working proficiency">${esc(
+                  (en.extras || []).map((item) => item.value || item.label).filter(Boolean).join('\n')
+                )}</textarea>
+    </div>`;
+    return card({ key: 'skills', title: '技能与证书', hint: 'English', body });
+  }
+
+  /** 英文版：自定义模块（标题沿用中文，条目可编辑） */
+  function enCustomCard(resume, custom) {
+    const en = RS.syncEnglish(resume) || {};
+    const ec = (en.customSections || []).find((c) => c.id === custom.id) || { items: [] };
+    const labels = Object.assign({}, RS.EN_CUSTOM_LABELS, ec.labels || {});
+    const items = (custom.items || [])
+      .map((zhItem) => {
+        const item = (ec.items || []).find((it) => it.id === zhItem.id) || { id: zhItem.id };
+        const body = ['name', 'role', 'start', 'end']
+          .map((key) =>
+            field({
+              label: labels[key],
+              value: item[key] || '',
+              hint: srcHint(zhItem[key]),
+              section: 'custom:' + custom.id,
+              id: item.id,
+              name: key,
+              scope: 'en',
+            })
+          )
+          .join('');
+        return `
+        <div class="item" data-item="${item.id}">
+          <div class="item-bar">
+            <span class="item-title">${esc(item.name || zhItem.name || '新条目')}</span>
+            <span class="item-tools">
+              <button class="icon-btn" data-action="translate-item" data-section="custom:${
+                custom.id
+              }" data-id="${item.id}" title="翻译这一条" aria-label="翻译这一条">译</button>
+            </span>
+          </div>
+          <div class="grid">${body}</div>
+          ${richField({
+            label: labels.desc,
+            value: item.desc || '',
+            hint: srcHint(zhItem.desc),
+            section: 'custom:' + custom.id,
+            id: item.id,
+            name: 'desc',
+            scope: 'en',
+          })}
+        </div>`;
+      })
+      .join('');
+
+    return card({
+      key: 'custom_' + custom.id,
+      title: custom.title,
+      hint: 'English',
+      count: (custom.items || []).length || undefined,
+      body: items || '<p class="empty-hint">中文版这一块还没有内容。</p>',
+    });
+  }
+
+  function renderEditor(root, resume, lang) {
     const customs = resume.customSections || [];
+    if (lang === 'en') {
+      root.innerHTML = [titleCard(resume), enBasicsCard(resume)]
+        .concat(ITEM_SECTIONS.map((meta) => enListCard(resume, meta)))
+        .concat([enSkillsCard(resume)])
+        .concat(customs.map((custom) => enCustomCard(resume, custom)))
+        .join('');
+      return;
+    }
     const html = [titleCard(resume), basicsCard(resume), orderCard(resume)]
       .concat(ITEM_SECTIONS.map((meta) => listCard(resume, meta)))
       .concat([skillsCard(resume)])
@@ -612,7 +830,7 @@
     if (field.dataset.bind) {
       handlers.setPath(field.dataset.bind, html);
     } else {
-      handlers.setField(field.dataset.section, field.dataset.id, field.dataset.field, html);
+      handlers.setField(field.dataset.section, field.dataset.id, field.dataset.field, html, field.dataset.scope);
     }
   }
 
@@ -628,6 +846,14 @@
         commitRich(el, handlers);
         return;
       }
+      if (el.matches('[data-list-lines]')) {
+        handlers.setListLines(el.dataset.listLines, el.value);
+        return;
+      }
+      if (el.matches('[data-extras-lines]')) {
+        handlers.setExtrasLines(el.dataset.extrasLines, el.value);
+        return;
+      }
       if (el.matches('[data-bind]')) {
         handlers.setPath(el.dataset.bind, el.value);
       } else if (el.matches('[data-custom-meta]')) {
@@ -635,7 +861,7 @@
       } else if (el.matches('[data-section-title]')) {
         handlers.setSectionTitle(el.dataset.sectionTitle, el.value);
       } else if (el.matches('[data-field]')) {
-        handlers.setField(el.dataset.section, el.dataset.id, el.dataset.field, el.value);
+        handlers.setField(el.dataset.section, el.dataset.id, el.dataset.field, el.value, el.dataset.scope);
       }
     });
 
@@ -766,6 +992,10 @@
         handlers.moveGroup(btn.dataset.group, Number(dir));
       } else if (action === 'move-section') {
         handlers.moveSection(btn.dataset.sectionId, Number(dir));
+      } else if (action === 'translate-item') {
+        handlers.translateItem(section, id);
+      } else if (action === 'translate-field') {
+        handlers.translateField(btn.dataset.target);
       }
     });
   }

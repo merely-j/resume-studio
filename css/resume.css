@@ -515,9 +515,10 @@
   }
 
   /* 打印时只留纸张本身：顶部栏、工具栏、编辑器、预览区顶栏、
-     手机版底部操作条全部隐藏 */
+     待翻译提示条、手机版底部操作条全部隐藏 */
   .app-header,
   .toolbar,
+  .notice-bar,
   .editor-pane,
   .preview-bar,
   .overflow-hint,

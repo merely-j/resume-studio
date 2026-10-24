@@ -804,15 +804,16 @@ async function main() {
          window.__printTitle = document.title;
        };
        document.getElementById('btnExportPdf').click();
+       document.getElementById('btnExportConfirm').click();
        return active.title;
      })()`
   );
   await sleep(600);
   const printTitle = await evaluate(client, `window.__printTitle || null`);
   record(
-    '导出 PDF 时文件名取简历名称',
-    printTitle === expectedName,
-    `标题="${printTitle}" 期望="${expectedName}"`
+    '导出 PDF 时文件名取简历名称（带 -中文）',
+    printTitle === expectedName + '-中文',
+    `标题="${printTitle}" 期望="${expectedName}-中文"`
   );
 
   // 8. 打印样式：预览区顶栏（含"压缩到一页"按钮）不能出现在 PDF 里
@@ -839,6 +840,144 @@ async function main() {
       printState.paper !== 'none' &&
       printState.hasButtonText === false,
     JSON.stringify(printState)
+  );
+
+  // 9. 中英双语
+  await evaluate(client, `(() => { document.getElementById('btnLangEn').click(); return true; })()`);
+  await sleep(600);
+  const enUi = await evaluate(
+    client,
+    `(() => ({
+       lang: document.body.dataset.lang,
+       labels: [...document.querySelectorAll('#editorPane .field-label')].map((el) => el.textContent.trim()).slice(0, 6),
+       notice: !document.getElementById('noticeBar').hidden,
+       noticeText: document.getElementById('noticeText').textContent,
+       srcHints: document.querySelectorAll('.src-hint').length,
+     }))()`
+  );
+  record(
+    '可以切到英文模式',
+    enUi.lang === 'en' &&
+      enUi.labels.some((t) => t.indexOf('Name') === 0) &&
+      enUi.notice === true &&
+      enUi.srcHints > 0,
+    `lang=${enUi.lang} 提示="${enUi.noticeText}" 原文提示=${enUi.srcHints}`
+  );
+
+  // 9.1 用假的接口验证"批量翻译"整条链路
+  await evaluate(
+    client,
+    `(() => {
+       localStorage.setItem('resume-app.translate.v1', JSON.stringify({
+         provider: 'deepseek',
+         baseUrl: 'https://api.example.com/v1',
+         model: 'test-model',
+         apiKey: 'sk-test',
+       }));
+       return true;
+     })()`
+  );
+  await client.send('Page.reload');
+  await sleep(1800);
+  await evaluate(client, `(() => { document.getElementById('btnLangEn').click(); return true; })()`);
+  await sleep(400);
+  await evaluate(
+    client,
+    `(() => {
+       window.__translateCalls = 0;
+       window.fetch = async (url, init) => {
+         window.__translateCalls += 1;
+         const body = JSON.parse(init.body);
+         const prompt = body.messages[1].content;
+         // 真正的载荷是 prompt 的最后一行 JSON 数组
+         const payloadLine = prompt.trim().split(String.fromCharCode(10)).pop();
+         const items = JSON.parse(payloadLine);
+         const mapped = items.map((it) => ({ id: it.id, en: 'EN:' + it.text.slice(0, 12) }));
+         return {
+           ok: true,
+           status: 200,
+           json: async () => ({ choices: [{ message: { content: JSON.stringify({ items: mapped }) } }] }),
+         };
+       };
+       document.getElementById('btnBatchTranslate').click();
+       return true;
+     })()`
+  );
+  await sleep(2500);
+  const translated = await evaluate(
+    client,
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       const en = active.en || {};
+       return {
+         calls: window.__translateCalls || 0,
+         name: (en.basics || {}).name || '',
+         firstCompany: ((en.experience || [])[0] || {}).company || '',
+         noticeHidden: document.getElementById('noticeBar').hidden,
+       };
+     })()`
+  );
+  record(
+    '批量翻译会调用接口并写回英文',
+    translated.calls > 0 &&
+      translated.name.indexOf('EN:') === 0 &&
+      translated.firstCompany.indexOf('EN:') === 0,
+    `调用 ${translated.calls} 次，name="${translated.name}"`
+  );
+
+  // 9.2 导出弹窗：中文 / 英文两个选项
+  const exportUi = await evaluate(
+    client,
+    `(() => {
+       document.getElementById('btnExportPdf').click();
+       const dialog = document.getElementById('exportDialog');
+       const result = {
+         open: dialog.open,
+         hasZh: !!document.getElementById('exportZh'),
+         hasEn: !!document.getElementById('exportEn'),
+       };
+       dialog.close();
+       return result;
+     })()`
+  );
+  record('导出弹窗可选中文或英文', exportUi.open && exportUi.hasZh && exportUi.hasEn, JSON.stringify(exportUi));
+
+  // 9.3 预览里点模块 → 跳回左侧对应卡片
+  await evaluate(client, `(() => { document.getElementById('btnLangZh').click(); return true; })()`);
+  await sleep(600);
+  const jumped = await evaluate(
+    client,
+    `(() => {
+       const sections = [...document.querySelectorAll('#paper [data-target]')];
+       const section = sections.find(
+         (s) => s.dataset.target === 'experience' && s.getBoundingClientRect().width > 0
+       );
+       if (!section) {
+         return {
+           ok: false,
+           reason: '没有找到工作经历模块',
+           lang: document.body.dataset.lang,
+           count: sections.length,
+           targets: sections.map((s) => s.dataset.target),
+         };
+       }
+       section.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+       const hovered = section.classList.contains('is-hover');
+       section.click();
+       const card = document.querySelector('#editorPane [data-card="experience"]');
+       return {
+         ok: !!card,
+         hovered,
+         flashed: card ? card.classList.contains('is-flash') : false,
+         label: section.dataset.label,
+       };
+     })()`
+  );
+  record(
+    '预览里点模块会跳回左侧并高亮',
+    jumped.ok && jumped.hovered && jumped.flashed,
+    JSON.stringify(jumped)
   );
 
   client.ws.close();

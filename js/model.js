@@ -308,6 +308,292 @@
     return plus ? '+' + digits : digits;
   }
 
+  /* ---------------------------- 英文版 ---------------------------- */
+
+  /** 英文版默认的模块标题（用户改名后以改名为准） */
+  const EN_SECTION_TITLES = {
+    summary: 'Summary',
+    experience: 'Experience',
+    projects: 'Projects',
+    education: 'Education',
+    skills: 'Skills & Certificates',
+    basics: 'Basics',
+  };
+
+  /** 英文版字段名（编辑器里显示） */
+  const EN_LABELS = {
+    name: 'Name',
+    headline: 'Headline',
+    city: 'City',
+    website: 'Website',
+    summary: 'Summary',
+    company: 'Company',
+    role: 'Title',
+    start: 'Start',
+    end: 'End',
+    desc: 'Description',
+    school: 'School',
+    major: 'Major',
+    degree: 'Degree',
+    skills: 'Skills',
+    certs: 'Certificates',
+    languages: 'Languages',
+  };
+
+  const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /**
+   * 日期转英文写法：2022.03 -> Mar 2022，至今 -> Present。
+   * 认不出来的（已经是英文）原样返回。
+   */
+  function enDate(value) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw) return '';
+    if (/至今|现在|now|present/i.test(raw)) return 'Present';
+    const m = /^(\d{4})\s*[.\-/年]\s*(\d{1,2})/.exec(raw);
+    if (m) {
+      const month = Math.min(12, Math.max(1, parseInt(m[2], 10)));
+      return EN_MONTHS[month - 1] + ' ' + m[1];
+    }
+    const yearOnly = /^(\d{4})$/.exec(raw);
+    if (yearOnly) return yearOnly[1];
+    return raw;
+  }
+
+  /** 空英文镜像：结构与中文一一对应，id 相同 */
+  function emptyEnglish() {
+    return {
+      basics: { name: '', headline: '', city: '', website: '', summary: '' },
+      experience: [],
+      projects: [],
+      education: [],
+      skills: [],
+      certs: [],
+      languages: [],
+      sectionTitles: {},
+      customSections: [],
+    };
+  }
+
+  /** 按 id 对齐：中文有、英文没有的补一条空记录；中文删掉的，英文也删 */
+  function syncList(zhList, enList, empty) {
+    const en = Array.isArray(enList) ? enList : [];
+    return (zhList || []).map((item) => {
+      const found = en.find((it) => it.id === item.id);
+      return found || empty(item.id);
+    });
+  }
+
+  /**
+   * 确保 resume.en 存在且与中文结构对齐。
+   * 每次切换语言、增删条目、打开简历时调用一次，代价很小。
+   */
+  function syncEnglish(resume) {
+    if (!resume) return null;
+    const zh = resume;
+    const en = zh.en && typeof zh.en === 'object' ? zh.en : emptyEnglish();
+    zh.en = en;
+
+    en.basics = Object.assign({ name: '', headline: '', city: '', website: '', summary: '' }, en.basics || {});
+
+    en.experience = syncList(zh.experience, en.experience, (id) => ({
+      id,
+      company: '',
+      role: '',
+      start: '',
+      end: '',
+      desc: '',
+    }));
+    en.projects = syncList(zh.projects, en.projects, (id) => ({
+      id,
+      name: '',
+      role: '',
+      start: '',
+      end: '',
+      desc: '',
+    }));
+    en.education = syncList(zh.education, en.education, (id) => ({
+      id,
+      school: '',
+      major: '',
+      degree: '',
+      start: '',
+      end: '',
+      desc: '',
+    }));
+
+    en.customSections = (zh.customSections || []).map((cs) => {
+      en.customSections = en.customSections || [];
+      const found = en.customSections.find((c) => c.id === cs.id);
+      const target = found || { id: cs.id, title: '', labels: {}, items: [] };
+      target.items = syncList(cs.items, target.items, (id) => ({
+        id,
+        name: '',
+        role: '',
+        start: '',
+        end: '',
+        desc: '',
+      }));
+      return target;
+    });
+
+    en.sectionTitles = en.sectionTitles || {};
+    en.skills = Array.isArray(en.skills) ? en.skills : [];
+    en.certs = Array.isArray(en.certs) ? en.certs : [];
+    en.languages = Array.isArray(en.languages) ? en.languages : [];
+    en.extras = syncList(zh.extras, en.extras, (id) => ({ id, label: '', value: '' }));
+    return en;
+  }
+
+  /** 英文模块标题（默认给英文名，用户改过以改名为准） */
+  function englishSectionTitle(resume, id) {
+    const en = (resume && resume.en) || {};
+    const custom = (en.sectionTitles || {})[id];
+    if (custom && String(custom).trim()) return String(custom).trim();
+    if (id.indexOf('custom:') === 0) {
+      const cs = (en.customSections || []).find((s) => 'custom:' + s.id === id);
+      return (cs && cs.title) || 'Section';
+    }
+    return EN_SECTION_TITLES[id] || id;
+  }
+
+  /**
+   * 生成"英文版简历"对象：结构、id、排版设置都沿用中文，
+   * 文案全部取自 en，缺失的就是空（宁可空着也不显示中文）。
+   */
+  function localizedResume(resume, lang) {
+    if (lang !== 'en') return resume;
+    const zh = resume;
+    const en = syncEnglish(zh) || emptyEnglish();
+    const b = zh.basics || {};
+    const eb = en.basics || {};
+
+    const sectionTitles = {};
+    allSectionIds(zh).forEach((id) => {
+      sectionTitles[id] = englishSectionTitle(zh, id);
+    });
+
+    const customSections = (zh.customSections || []).map((cs) => {
+      const ec = (en.customSections || []).find((c) => c.id === cs.id) || { items: [] };
+      return {
+        id: cs.id,
+        title: (ec.title && String(ec.title).trim()) || cs.title,
+        labels: Object.assign({}, EN_CUSTOM_LABELS, ec.labels || {}),
+        items: (cs.items || []).map((item) => {
+          const ei = (ec.items || []).find((it) => it.id === item.id) || {};
+          return {
+            id: item.id,
+            name: ei.name || '',
+            role: ei.role || '',
+            start: ei.start || enDate(item.start),
+            end: ei.end || enDate(item.end),
+            desc: ei.desc || '',
+          };
+        }),
+      };
+    });
+
+    return Object.assign({}, zh, {
+      lang: 'en',
+      basics: Object.assign({}, b, {
+        name: eb.name || '',
+        headline: eb.headline || '',
+        city: eb.city || '',
+        website: eb.website || '',
+        summary: eb.summary || '',
+        // 英文简历不写性别、民族、生日、籍贯、政治面貌
+        gender: '',
+        ethnicity: '',
+        birthday: '',
+        hometown: '',
+        politics: '',
+        // 联系方式沿用中文里填的
+        phone: b.phone,
+        email: b.email,
+      }),
+      experience: (zh.experience || []).map((item) => {
+        const ei = (en.experience || []).find((it) => it.id === item.id) || {};
+        return {
+          id: item.id,
+          company: ei.company || '',
+          role: ei.role || '',
+          start: ei.start || enDate(item.start),
+          end: ei.end || enDate(item.end),
+          desc: ei.desc || '',
+        };
+      }),
+      projects: (zh.projects || []).map((item) => {
+        const ei = (en.projects || []).find((it) => it.id === item.id) || {};
+        return {
+          id: item.id,
+          name: ei.name || '',
+          role: ei.role || '',
+          start: ei.start || enDate(item.start),
+          end: ei.end || enDate(item.end),
+          desc: ei.desc || '',
+        };
+      }),
+      education: (zh.education || []).map((item) => {
+        const ei = (en.education || []).find((it) => it.id === item.id) || {};
+        return {
+          id: item.id,
+          school: ei.school || '',
+          major: ei.major || '',
+          degree: ei.degree || '',
+          start: ei.start || enDate(item.start),
+          end: ei.end || enDate(item.end),
+          desc: ei.desc || '',
+        };
+      }),
+      skills: en.skills || [],
+      certs: en.certs || [],
+      languages: en.languages || [],
+      // 证书 / 其他：英文版是独立的一段行文本，没填就不显示
+      extras: (en.extras || []).filter((item) => item.label || item.value),
+      sectionTitles: sectionTitles,
+      customSections: customSections,
+    });
+  }
+
+  /** 自定义模块在英文版里的默认字段名 */
+  const EN_CUSTOM_LABELS = {
+    name: 'Name',
+    role: 'Role',
+    start: 'Start',
+    end: 'End',
+    desc: 'Description',
+  };
+
+  /** 统计英文版还有多少字段没填（用于"还有 N 处待翻译"） */
+  function countMissingEnglish(resume) {
+    const en = syncEnglish(resume);
+    let missing = 0;
+    const check = (value) => {
+      if (!String(value == null ? '' : value).trim()) missing += 1;
+    };
+    const eb = en.basics || {};
+    ['name', 'headline', 'summary'].forEach((k) => check(eb[k]));
+    (en.experience || []).forEach((it) => {
+      check(it.company);
+      check(it.role);
+      check(it.desc);
+    });
+    (en.projects || []).forEach((it) => {
+      check(it.name);
+      check(it.desc);
+    });
+    (en.education || []).forEach((it) => {
+      check(it.school);
+      check(it.major);
+    });
+    if (!(en.skills || []).length) missing += 1;
+    (en.customSections || []).forEach((cs) => {
+      if (!String(cs.title || '').trim()) missing += 1;
+      (cs.items || []).forEach((it) => check(it.name));
+    });
+    return missing;
+  }
+
   RS.uid = uid;
   RS.TEMPLATES = TEMPLATES;
   RS.RESUME_SECTIONS = RESUME_SECTIONS;
@@ -329,4 +615,12 @@
   RS.toBullets = toBullets;
   RS.formatRange = formatRange;
   RS.formatBirthday = formatBirthday;
+  RS.englishSectionTitle = englishSectionTitle;
+  RS.syncEnglish = syncEnglish;
+  RS.localizedResume = localizedResume;
+  RS.emptyEnglish = emptyEnglish;
+  RS.countMissingEnglish = countMissingEnglish;
+  RS.EN_SECTION_TITLES = EN_SECTION_TITLES;
+  RS.EN_LABELS = EN_LABELS;
+  RS.enDate = enDate;
 })();
