@@ -37,6 +37,24 @@ Build a resume on your phone, see the A4 layout update live, export a print-read
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z), up to 50 steps
 - Installable as a home-screen app (PWA) and works offline
 
+**Bilingual (Chinese + English)**
+
+- One resume, two languages: Chinese and English share the same entry structure but are edited independently
+- **One-click translation** through your own LLM API (DeepSeek / Kimi / Qwen / GLM / OpenAI / any OpenAI-compatible endpoint) — batched by field, with per-item re-translation
+- Each English field shows the Chinese source next to it; the English version omits gender, ethnicity, date of birth and similar fields
+- Export Chinese and English as two separate PDFs
+
+**Using the English version for the first time**
+
+1. Click **English** in the language switch
+2. If no translation service is configured yet, the settings dialog opens immediately (so you never land on a blank English form)
+3. Pick a provider, paste your API key, optionally hit **Test connection**, then **Save and translate**
+4. Translation starts right after saving; later edits are handled by the "Translate all" button in the notice bar
+
+You can skip the API entirely: choose "Fill in manually" and type the English yourself — every English field is editable.
+
+> Your API key is stored only in this browser's local storage. Nothing is uploaded and nothing is committed to the repo. Browser-side calls may be blocked by CORS depending on the provider; the app reports that clearly so you can switch providers or point it at your own proxy.
+
 ---
 
 ## Who it's for
