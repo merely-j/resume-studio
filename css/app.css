@@ -1065,6 +1065,27 @@ body {
   margin-bottom: 0;
 }
 
+/* 编辑区顶部的一句说明：字段都是可选的 */
+.optional-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border: 1px solid #dbe0fb;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #4338ca;
+}
+
+.optional-hint-icon {
+  flex: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 /* 弹窗里每条设置之间的间距 */
 .sheet-body .field {
   margin-bottom: 12px;

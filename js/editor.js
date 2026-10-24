@@ -858,17 +858,23 @@
     });
   }
 
+  /** 顶部的一句说明：所有字段都是可选的，留空就不会出现在 PDF 里 */
+  const optionalHint = (lang) =>
+    lang === 'en'
+      ? `<p class="optional-hint"><span class="optional-hint-icon" aria-hidden="true">ⓘ</span>Everything is optional — anything you leave blank simply won't appear in the exported PDF. Fill in only what you need.</p>`
+      : `<p class="optional-hint"><span class="optional-hint-icon" aria-hidden="true">ⓘ</span>所有内容都可以不填：留空的项目不会出现在导出的 PDF 里，只写你需要的那部分就行。</p>`;
+
   function renderEditor(root, resume, lang) {
     const customs = resume.customSections || [];
     if (lang === 'en') {
-      root.innerHTML = [titleCard(resume), enBasicsCard(resume)]
+      root.innerHTML = [optionalHint(lang), titleCard(resume), enBasicsCard(resume)]
         .concat(ITEM_SECTIONS.map((meta) => enListCard(resume, meta)))
         .concat([enSkillsCard(resume)])
         .concat(customs.map((custom) => enCustomCard(resume, custom)))
         .join('');
       return;
     }
-    const html = [titleCard(resume), basicsCard(resume), orderCard(resume)]
+    const html = [optionalHint(lang), titleCard(resume), basicsCard(resume), orderCard(resume)]
       .concat(ITEM_SECTIONS.map((meta) => listCard(resume, meta)))
       .concat([skillsCard(resume)])
       .concat(customs.map((custom) => customCard(resume, custom)))

@@ -1040,6 +1040,21 @@ async function main() {
     JSON.stringify(jumped)
   );
 
+  // 编辑区顶部要有"可不填"的说明
+  const hint = await evaluate(
+    client,
+    `(() => {
+       if (document.body.dataset.lang !== 'zh') document.getElementById('btnLangZh').click();
+       const el = document.querySelector('#editorPane .optional-hint');
+       return { exists: !!el, text: el ? el.textContent.replace(/\\s+/g, ' ').trim() : '' };
+     })()`
+  );
+  record(
+    '编辑区顶部说明了"留空就不显示"',
+    hint.exists && hint.text.indexOf('不会出现在导出的 PDF') !== -1,
+    hint.text.slice(0, 40)
+  );
+
   client.ws.close();
 
   for (const r of results) {
