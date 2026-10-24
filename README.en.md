@@ -68,11 +68,8 @@ Open the link and use your browser's **Add to Home Screen** — it then behaves 
 
 ### 3. Locally (offline)
 
-- **Windows**: double-click `启动.bat` — it starts a local server and opens the browser
-- Or just double-click `index.html`
-- Developers: `node server.mjs` → `http://localhost:8080/`
-
-To open it on your phone from the same Wi-Fi, use the `http://192.168.x.x:8080/` address the server prints.
+- Just double-click `index.html`
+- To open it on your phone from the same Wi-Fi, run `node server.mjs` and use the `http://192.168.x.x:8080/` address it prints
 
 ### 4. Build distributables
 

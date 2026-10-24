@@ -116,9 +116,9 @@ async function main() {
   console.log(`  通用单文件  dist/简历工坊.html            ${await sizeOf(join(dist, '简历工坊.html'))}`);
   console.log(`  手机版      dist/简历工坊-手机版.html     ${await sizeOf(join(dist, '简历工坊-手机版.html'))}`);
   console.log('\n下一步：');
-  console.log('  · 网站版：把 dist/web 整个文件夹拖到 https://app.netlify.com/drop');
-  console.log('  · 手机版：发 dist/简历工坊-手机版.html 给手机，用浏览器打开');
-  console.log('  · 详细说明见 DEPLOY.md\n');
+  console.log('  · 线上：push 到 main，GitHub Actions 自动发布 site');
+  console.log('  · 本地看效果：双击 dist/简历工坊.html');
+  console.log('  · 手机上看：把 dist/简历工坊-手机版.html 发到手机，用浏览器打开\n');
 }
 
 main().catch((err) => {
