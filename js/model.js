@@ -394,7 +394,10 @@
     const en = zh.en && typeof zh.en === 'object' ? zh.en : emptyEnglish();
     zh.en = en;
 
-    en.basics = Object.assign({ name: '', headline: '', city: '', website: '', summary: '' }, en.basics || {});
+    en.basics = Object.assign(
+      { name: '', headline: '', city: '', website: '', summary: '', gender: '', ethnicity: '', hometown: '', politics: '' },
+      en.basics || {}
+    );
 
     en.experience = syncList(zh.experience, en.experience, (id) => ({
       id,
@@ -473,6 +476,15 @@
       sectionTitles[id] = englishSectionTitle(zh, id);
     });
 
+    /**
+     * 版式必须和中文稿完全一致：英文没填的字段一律回退到中文原文，
+     * 这样模块不会因为"还没翻译"而整段消失。翻译过的字段用英文。
+     */
+    const pick = (enValue, zhValue) => {
+      const enText = String(enValue == null ? '' : enValue).trim();
+      return enText || zhValue || '';
+    };
+
     const customSections = (zh.customSections || []).map((cs) => {
       const ec = (en.customSections || []).find((c) => c.id === cs.id) || { items: [] };
       return {
@@ -483,30 +495,33 @@
           const ei = (ec.items || []).find((it) => it.id === item.id) || {};
           return {
             id: item.id,
-            name: ei.name || '',
-            role: ei.role || '',
-            start: ei.start || enDate(item.start),
-            end: ei.end || enDate(item.end),
-            desc: ei.desc || '',
+            name: pick(ei.name, item.name),
+            role: pick(ei.role, item.role),
+            start: pick(ei.start, enDate(item.start) || item.start),
+            end: pick(ei.end, enDate(item.end) || item.end),
+            desc: pick(ei.desc, item.desc),
           };
         }),
       };
     });
 
+    const enExtras = (en.extras || []).filter((item) => item.label || item.value);
+    const zhExtras = (zh.extras || []).filter((item) => item.label || item.value);
+
     return Object.assign({}, zh, {
       lang: 'en',
       basics: Object.assign({}, b, {
-        name: eb.name || '',
-        headline: eb.headline || '',
-        city: eb.city || '',
-        website: eb.website || '',
-        summary: eb.summary || '',
-        // 英文简历不写性别、民族、生日、籍贯、政治面貌
-        gender: '',
-        ethnicity: '',
-        birthday: '',
-        hometown: '',
-        politics: '',
+        name: pick(eb.name, b.name),
+        headline: pick(eb.headline, b.headline),
+        city: pick(eb.city, b.city),
+        website: pick(eb.website, b.website),
+        summary: pick(eb.summary, b.summary),
+        // 个人信息行也要保留：英文没翻就用中文，行数和中文稿一致
+        gender: pick(eb.gender, b.gender),
+        ethnicity: pick(eb.ethnicity, b.ethnicity),
+        birthday: b.birthday,
+        hometown: pick(eb.hometown, b.hometown),
+        politics: pick(eb.politics, b.politics),
         // 联系方式沿用中文里填的
         phone: b.phone,
         email: b.email,
@@ -515,41 +530,41 @@
         const ei = (en.experience || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          company: ei.company || '',
-          role: ei.role || '',
-          start: ei.start || enDate(item.start),
-          end: ei.end || enDate(item.end),
-          desc: ei.desc || '',
+          company: pick(ei.company, item.company),
+          role: pick(ei.role, item.role),
+          start: pick(ei.start, enDate(item.start) || item.start),
+          end: pick(ei.end, enDate(item.end) || item.end),
+          desc: pick(ei.desc, item.desc),
         };
       }),
       projects: (zh.projects || []).map((item) => {
         const ei = (en.projects || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          name: ei.name || '',
-          role: ei.role || '',
-          start: ei.start || enDate(item.start),
-          end: ei.end || enDate(item.end),
-          desc: ei.desc || '',
+          name: pick(ei.name, item.name),
+          role: pick(ei.role, item.role),
+          start: pick(ei.start, enDate(item.start) || item.start),
+          end: pick(ei.end, enDate(item.end) || item.end),
+          desc: pick(ei.desc, item.desc),
         };
       }),
       education: (zh.education || []).map((item) => {
         const ei = (en.education || []).find((it) => it.id === item.id) || {};
         return {
           id: item.id,
-          school: ei.school || '',
-          major: ei.major || '',
-          degree: ei.degree || '',
-          start: ei.start || enDate(item.start),
-          end: ei.end || enDate(item.end),
-          desc: ei.desc || '',
+          school: pick(ei.school, item.school),
+          major: pick(ei.major, item.major),
+          degree: pick(ei.degree, item.degree),
+          start: pick(ei.start, enDate(item.start) || item.start),
+          end: pick(ei.end, enDate(item.end) || item.end),
+          desc: pick(ei.desc, item.desc),
         };
       }),
-      skills: en.skills || [],
-      certs: en.certs || [],
-      languages: en.languages || [],
-      // 证书 / 其他：英文版是独立的一段行文本，没填就不显示
-      extras: (en.extras || []).filter((item) => item.label || item.value),
+      // 技能 / 证书：英文填了就替换，没填保留中文，模块不会消失
+      skills: (en.skills || []).length ? en.skills : zh.skills || [],
+      certs: (en.certs || []).length ? en.certs : zh.certs || [],
+      languages: (en.languages || []).length ? en.languages : zh.languages || [],
+      extras: enExtras.length ? enExtras : zhExtras,
       sectionTitles: sectionTitles,
       customSections: customSections,
     });

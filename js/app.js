@@ -133,15 +133,6 @@
     applyLayout(resume);
     syncFitButton(resume);
     syncLangUi(resume);
-
-    // 英文版还是空的：给一句提示，别让人对着一张白纸
-    if (state.lang === 'en' && !el.paper.querySelector('.r-section')) {
-      const hint = document.createElement('p');
-      hint.className = 'r-empty-hint';
-      hint.textContent = '英文版还没有内容：点上方「批量翻译」，或直接在左侧填写英文。';
-      el.paper.appendChild(hint);
-    }
-
     checkOverflow();
     fitPaper();
 
@@ -511,7 +502,7 @@
   function collectTranslatable(resume) {
     const fields = [];
     const b = resume.basics || {};
-    ['name', 'headline', 'city', 'website', 'summary'].forEach((key) => {
+    ['name', 'headline', 'city', 'website', 'summary', 'gender', 'ethnicity', 'hometown', 'politics'].forEach((key) => {
       const text = plainText(b[key]);
       if (text) fields.push({ key: 'basics.' + key, text: text });
     });

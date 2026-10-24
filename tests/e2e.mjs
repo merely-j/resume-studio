@@ -1011,6 +1011,33 @@ async function main() {
     JSON.stringify(jumped)
   );
 
+  // 9.4 版式一致：英文稿的模块数、条目数、要点数、个人信息行必须和中文稿一样
+  const layoutCompare = await evaluate(
+    client,
+    `(() => {
+       const snap = () => ({
+         sections: document.querySelectorAll('#paper .r-section').length,
+         entries: document.querySelectorAll('#paper .r-entry').length,
+         personal: !!document.querySelector('#paper .r-personal'),
+         contact: !!document.querySelector('#paper .r-contact'),
+         skills: !!document.querySelector('#paper .r-skills'),
+       });
+       if (document.body.dataset.lang !== 'zh') document.getElementById('btnLangZh').click();
+       const zh = snap();
+       document.getElementById('btnLangEn').click();
+       const dialog = document.getElementById('translateDialog');
+       if (dialog.open) dialog.close();
+       const en = snap();
+       document.getElementById('btnLangZh').click();
+       return { zh, en };
+     })()`
+  );
+  record(
+    '英文稿版式与中文稿一致',
+    JSON.stringify(layoutCompare.zh) === JSON.stringify(layoutCompare.en),
+    `中=${JSON.stringify(layoutCompare.zh)} 英=${JSON.stringify(layoutCompare.en)}`
+  );
+
   client.ws.close();
 
   for (const r of results) {
