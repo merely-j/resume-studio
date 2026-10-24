@@ -2,6 +2,8 @@
 
 手机上填写、实时预览、导出 A4 PDF 的简历应用。**纯前端 PWA，零依赖、零构建**，数据只存在本机。
 
+**在线试用**：<https://merely-j.github.io/resume-studio/>
+
 ![手机端编辑](shots/phone-edit.png)
 
 ---

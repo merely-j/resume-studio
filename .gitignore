@@ -4,3 +4,8 @@ Thumbs.db
 *.log
 .chrome-*/
 dist/
+
+# 本机专用的发布脚本（写死了本机路径，不进仓库）
+tools/publish-github.mjs
+tools/publish-github.ps1
+tools/enable-pages.mjs
