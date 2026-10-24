@@ -123,32 +123,6 @@ node tests/e2e.mjs       # 真浏览器端到端测试
 
 ---
 
-## 部署
-
-- **[DEPLOY-CN.md](DEPLOY-CN.md)** —— 国内方案（免备案的平台域名 / 自有域名 + 备案）
-- **[DEPLOY.md](DEPLOY.md)** —— 通用分发（Netlify / Vercel / GitHub Pages / 上架 App）
-- **[DOMAIN.md](DOMAIN.md)** —— 自己域名的 DNS 绑定流程
-
-GitHub Pages 已配好自动部署：push 到 `main` 后，`.github/workflows/pages.yml` 会自动构建并发布。
-
----
-
-## 常见问题
-
-**手机打不开 / 显示空白？**
-用 `http://` 或 `https://` 打开，不要用 `file://`。局域网访问要连同一个 Wi-Fi，并放行防火墙。
-
-**数据会丢吗？**
-存在浏览器 localStorage：清缓存、换浏览器会丢。重要简历记得导出 PDF 留档。
-
-**导出的 PDF 有背景色缺失？**
-打印对话框里勾选「背景图形 / Background graphics」。
-
-**能改成我们公司的模板吗？**
-可以。改 `css/resume.css` 加一段模板样式，再在 `js/preview.js` 加对应函数即可，字段不用动。
-
----
-
 ## 许可证
 
 [MIT](LICENSE) —— 可以自由使用、修改、商用，保留版权声明即可。

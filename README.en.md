@@ -118,28 +118,6 @@ Deeper notes on the design decisions and pitfalls: **[ARCHITECTURE.md](ARCHITECT
 
 ---
 
-## Deploy
-
-- **[DEPLOY.md](DEPLOY.md)** — Netlify / Vercel / GitHub Pages, and packaging as an app
-- **[DEPLOY-CN.md](DEPLOY-CN.md)** — hosting from mainland China (ICP filing walkthrough)
-- **[DOMAIN.md](DOMAIN.md)** — pointing your own domain at a host
-
-Pushing to `main` triggers `.github/workflows/pages.yml`, which builds and publishes to GitHub Pages automatically.
-
----
-
-## FAQ
-
-**Blank page on my phone?** Open it over `http://` or `https://`, not `file://`.
-
-**Will my data disappear?** It lives in local storage — clearing browser data or switching devices loses it. Export a PDF you care about.
-
-**The PDF is missing background colours?** Tick "Background graphics" in the print dialog.
-
-**Can I use our company template?** Yes — add a `.tpl-*` block in `css/resume.css` and a matching function in `js/preview.js`. Fields stay the same.
-
----
-
 ## License
 
 [MIT](LICENSE) — free to use, modify and sell; keep the copyright notice.
