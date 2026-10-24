@@ -4,6 +4,8 @@
 
 **在线直接用**：<https://merely-j.github.io/resume-studio/>
 
+简体中文 · [English](README.en.md)
+
 ![手机端界面](shots/phone-edit.png)
 
 ---
