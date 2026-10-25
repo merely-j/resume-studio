@@ -1170,6 +1170,29 @@ async function main() {
     `左=${syncState.leftVisible.join(',')} 纸=${syncState.paper.join(',')}`
   );
 
+  // 自定义模块也要能从预览点回左侧（用纸面上实际存在的那个自定义模块）
+  const customJumpResult = await evaluate(
+    client,
+    `(() => {
+       const builtin = ['summary', 'experience', 'projects', 'education', 'skills'];
+       const section = [...document.querySelectorAll('#paper [data-target]')].find(
+         (s) => builtin.indexOf(s.dataset.target) === -1
+       );
+       if (!section) {
+         return { ok: false, reason: '纸面上没有自定义模块', targets: [...document.querySelectorAll('#paper [data-target]')].map((s) => s.dataset.target) };
+       }
+       const id = section.dataset.target;
+       section.click();
+       const card = document.querySelector('[data-card="custom_' + id + '"]');
+       return { ok: !!card, id, flashed: card ? card.classList.contains('is-flash') : false };
+     })()`
+  );
+  record(
+    '预览里点自定义模块也会跳回左侧',
+    customJumpResult.ok === true && customJumpResult.flashed === true,
+    JSON.stringify(customJumpResult)
+  );
+
   client.ws.close();
 
   for (const r of results) {

@@ -1288,10 +1288,22 @@
   /** 预览区点某个模块 → 跳到左侧对应卡片，展开并聚焦第一个输入框 */
   function jumpToSection(target) {
     if (!target) return;
-    const cardKey = target.indexOf('custom:') === 0 ? 'custom_' + target.slice(7) : target;
+
+    // 模块 id 有两种来源：
+    //   内置模块   → 'experience'           卡片 data-card="experience"
+    //   自定义模块 → 'c_xxx'（裸 id）或 'custom:c_xxx'，卡片 data-card="custom_c_xxx"
+    // 这里三种写法都试一遍，避免"点了没反应"
+    const bare = target.indexOf('custom:') === 0 ? target.slice(7) : target;
+    const candidates = ['[data-card="' + target + '"]', '[data-card="custom_' + bare + '"]'];
     if (document.body.dataset.view === 'preview') setView('edit');
-    const card = el.editor.querySelector('[data-card="' + cardKey + '"]');
+
+    let card = null;
+    for (const selector of candidates) {
+      card = el.editor.querySelector(selector);
+      if (card) break;
+    }
     if (!card) return;
+
     if (card.tagName === 'DETAILS') card.open = true;
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.remove('is-flash');
