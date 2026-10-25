@@ -14,7 +14,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
-    <meta name="app-version" content="0.5.4" />
+    <meta name="app-version" content="0.6.0" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
@@ -341,11 +341,11 @@
             <em id="exportEnCount">—</em>
           </span>
         </label>
-        <p class="hint">每次导出一份；中文和英文是两份独立的简历。</p>
+        <p class="hint">点「下载 PDF」会直接保存到下载文件夹，不会打开打印界面。每次导出一份；中文和英文是两份独立的简历。</p>
       </div>
       <div class="sheet-foot">
         <button class="btn btn-ghost" type="button" data-close-export>取消</button>
-        <button class="btn btn-primary" id="btnExportConfirm" type="button">导出</button>
+        <button class="btn btn-primary" id="btnExportConfirm" type="button">下载 PDF</button>
       </div>
     </dialog>
 
@@ -471,6 +471,7 @@
     <script src="./js/store.js"></script>
     <script src="./js/preview.js"></script>
     <script src="./js/pdfimport.js"></script>
+    <script src="./js/pdfexport.js"></script>
     <script src="./js/editor.js"></script>
     <script src="./js/app.js"></script>
 

@@ -1544,43 +1544,63 @@
     return (text || '我的简历').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
   }
 
-  function exportPdf(lang) {
+  let exporting = false;
+
+  /**
+   * 直接生成 PDF 并下载，不走打印对话框。
+   * 逐行读取预览的排版再"画"成真文字，所以耗时 0.5–1.5 秒，
+   * 期间按钮显示"正在生成…"。
+   */
+  async function exportPdf(lang) {
+    if (exporting) return;
     const target = lang === 'en' ? 'en' : 'zh';
     const resume = activeResume();
-    const filename = safeName(resume.title) + (target === 'en' ? '-EN' : '-中文');
-    const previousTitle = document.title;
+    const filename = safeName(resume.title) + (target === 'en' ? '-EN' : '-中文') + '.pdf';
     const previousLang = state.lang;
 
-    // 打印的是"当前预览"，所以先切到要导出的语言
+    // 导出的是"当前预览"，先切到要导出的语言
     if (state.lang !== target) {
       state.lang = target;
       paintEditor();
       renderPreview();
     }
 
-    // 浏览器打印时，"另存为 PDF"的默认文件名取自 document.title，
-    // 所以打印前临时把标题换成简历名，打完再换回来。
-    document.title = filename;
-    toast('文件名默认是「' + filename + '」，在打印窗口选「另存为 PDF」');
+    exporting = true;
+    const label = el.btnExportConfirm ? el.btnExportConfirm.textContent : '';
+    if (el.btnExportConfirm) {
+      el.btnExportConfirm.disabled = true;
+      el.btnExportConfirm.textContent = '正在生成…';
+    }
+    toast('正在生成 PDF…');
 
-    let restored = false;
-    const restore = () => {
-      if (restored) return;
-      restored = true;
-      document.title = previousTitle;
-      window.removeEventListener('afterprint', restore);
+    // 手机上是"编辑/预览"二选一，编辑态下纸面是隐藏的（量不到尺寸）。
+    // 导出前先切到预览，导完再切回来。
+    const previousView = document.body.dataset.view;
+    const needViewSwitch = previousView !== 'preview';
+    if (needViewSwitch) setView('preview');
+
+    try {
+      // 等一帧，确保预览已经按目标语言重绘
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 80)));
+      const size = await RS.pdfExport.download(el.paper, filename);
+      toast('已下载 ' + filename + '（' + Math.max(1, Math.round(size / 1024)) + ' KB）');
+    } catch (err) {
+      console.error('[导出]', err);
+      toast('导出失败：' + (err && err.message ? err.message : '未知错误'));
+    } finally {
+      exporting = false;
+      if (el.btnExportConfirm) {
+        el.btnExportConfirm.disabled = false;
+        el.btnExportConfirm.textContent = label || '下载 PDF';
+      }
+      if (el.exportDialog && el.exportDialog.open) el.exportDialog.close();
       if (state.lang !== previousLang) {
         state.lang = previousLang;
         paintEditor();
         renderPreview();
       }
-    };
-    window.addEventListener('afterprint', restore);
-    // 兜底：某些环境下 afterprint 不触发
-    setTimeout(restore, 60000);
-
-    // 等 toast 画出来再调起打印，否则部分浏览器会吞掉提示
-    setTimeout(() => window.print(), 250);
+      if (needViewSwitch) setView(previousView || 'edit');
+    }
   }
 
   /** 导出前先问：中文版还是英文版 */
@@ -1600,7 +1620,7 @@
         toast('英文版还有 ' + missing + ' 处没翻译，会以空内容导出');
       }
     }
-    el.exportDialog.close();
+    // 面板先留着，生成时按钮显示"正在生成…"，生成完再关
     exportPdf(lang);
   }
 

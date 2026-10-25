@@ -869,26 +869,40 @@ async function main() {
   record('刷新后模板选择保留', persisted.template === 'modern');
   record('刷新后技能标签仍在', persisted.chips > 0, `chips=${persisted.chips}`);
 
-  // 7.1 导出 PDF 的默认文件名 = 简历名称（打印前把 document.title 换成简历名）
+  // 7.1 导出 PDF 的文件名 = 简历名称（直接下载，不再改 document.title）
   const expectedName = await evaluate(
     client,
     `(() => {
        const state = JSON.parse(localStorage.getItem('resume-app.v1'));
        const active = state.resumes.find((r) => r.id === state.activeId);
-       window.print = () => {
-         window.__printTitle = document.title;
+       window.__downloadedName = null;
+       const original = window.RS.pdfExport.download;
+       window.RS.pdfExport.download = (paper, name) => {
+         window.__downloadedName = name;
+         return Promise.resolve(2048);
        };
        document.getElementById('btnExportPdf').click();
        document.getElementById('btnExportConfirm').click();
+       window.RS.pdfExport.__original = original;
        return active.title;
      })()`
   );
-  await sleep(600);
-  const printTitle = await evaluate(client, `window.__printTitle || null`);
+  await sleep(800);
+  const downloadedName = await evaluate(
+    client,
+    `(() => {
+       const name = window.__downloadedName;
+       if (window.RS.pdfExport.__original) {
+         window.RS.pdfExport.download = window.RS.pdfExport.__original;
+         delete window.RS.pdfExport.__original;
+       }
+       return name;
+     })()`
+  );
   record(
     '导出 PDF 时文件名取简历名称（带 -中文）',
-    printTitle === expectedName + '-中文',
-    `标题="${printTitle}" 期望="${expectedName}-中文"`
+    downloadedName === expectedName + '-中文.pdf',
+    `文件名="${downloadedName}" 期望="${expectedName}-中文.pdf"`
   );
 
   // 8. 打印样式：预览区顶栏（含"压缩到一页"按钮）不能出现在 PDF 里
@@ -1040,6 +1054,7 @@ async function main() {
     client,
     `(() => {
        window.__translateCalls = 0;
+       window.__realFetch = window.__realFetch || window.fetch;
        window.fetch = async (url, init) => {
          window.__translateCalls += 1;
          const body = JSON.parse(init.body);
@@ -1080,6 +1095,9 @@ async function main() {
       translated.firstCompany.indexOf('EN:') === 0,
     `调用 ${translated.calls} 次，name="${translated.name}"`
   );
+
+  // 还原被替换的 fetch，避免影响后面的导出（导出要下载字体）
+  await evaluate(client, `(() => { if (window.__realFetch) window.fetch = window.__realFetch; return true; })()`);
 
   // 9.2 导出弹窗：中文 / 英文两个选项
   const exportUi = await evaluate(
@@ -1387,6 +1405,52 @@ async function main() {
     );
   } else {
     console.log('（跳过 PDF 导入测试：本机没有示例 PDF）');
+  }
+
+  // 导出 PDF：点一下直接生成文件（不走打印对话框）
+  const exportBtn = await evaluate(
+    client,
+    `(() => {
+       document.getElementById('btnExportPdf').click();
+       return {
+         dialogOpen: document.getElementById('exportDialog').open,
+         label: document.getElementById('btnExportConfirm').textContent.trim(),
+       };
+     })()`
+  );
+  record(
+    '导出面板只提供下载（没有打印）',
+    exportBtn.dialogOpen === true && exportBtn.label.indexOf('下载') !== -1,
+    JSON.stringify(exportBtn)
+  );
+
+  const pdfOut = await evaluate(
+    client,
+    `(async () => {
+       document.getElementById('exportDialog').close();
+       const result = await Promise.race([
+         window.RS.pdfExport.toBlob(document.getElementById('paper')).then(async (blob) => {
+           const buf = new Uint8Array(await blob.arrayBuffer());
+           return {
+             size: buf.length,
+             head: String.fromCharCode.apply(null, buf.slice(0, 5)),
+             stage: window.__exportStage,
+           };
+         }),
+         new Promise((resolve) => setTimeout(() => resolve({ timeout: true, stage: window.__exportStage }), 40000)),
+       ]);
+       const stats = window.__pdfExportStats || {};
+       return Object.assign({ runs: stats.runs, pages: stats.pages }, result);
+     })()`
+  );
+  if (pdfOut && pdfOut.timeout) {
+    record('能直接生成 PDF 文件（文字版）', false, `超时，卡在 ${pdfOut.stage}`);
+  } else {
+    record(
+      '能直接生成 PDF 文件（文字版）',
+      pdfOut.head === '%PDF-' && pdfOut.size > 20000 && pdfOut.runs > 30,
+      `${Math.round(pdfOut.size / 1024)}KB，${pdfOut.runs} 行文字，${pdfOut.pages} 页`
+    );
   }
 
   client.ws.close();

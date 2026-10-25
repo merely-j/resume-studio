@@ -7,7 +7,7 @@
  * 改完代码要让用户看到更新，把 CACHE 名字加个版本号即可（必要时引导刷新）。
  */
 
-const CACHE = 'resume-app-v0.5.4';
+const CACHE = 'resume-app-v0.6.0';
 
 const ASSETS = [
   './',
@@ -18,6 +18,7 @@ const ASSETS = [
   './js/model.js',
   './js/preview.js',
   './js/pdfimport.js',
+  './js/pdfexport.js',
   './js/editor.js',
   './js/store.js',
   './manifest.webmanifest',
