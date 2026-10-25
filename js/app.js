@@ -50,6 +50,7 @@
     resumeList: document.getElementById('resumeList'),
     newName: document.getElementById('newResumeName'),
     appVersion: document.getElementById('appVersion'),
+    snapList: document.getElementById('snapList'),
     confirmDialog: document.getElementById('confirmDialog'),
     confirmText: document.getElementById('confirmText'),
     btnConfirmOk: document.getElementById('btnConfirmOk'),
@@ -107,15 +108,119 @@
 
   /* ---------------------------- 保存 ---------------------------- */
 
+  let lastSavedAt = 0;
+  let savePending = false;
+
+  /** 顶部那行"保存状态"：保存中 / 已保存 16:20 / 保存失败 */
+  function updateSaveStatus() {
+    const node = document.getElementById('saveStatus');
+    if (!node) return;
+    if (saveFailed) {
+      node.textContent = '保存失败：本次修改只在当前页面有效';
+      node.classList.add('is-error');
+      return;
+    }
+    node.classList.remove('is-error');
+    if (savePending) {
+      node.textContent = '保存中…';
+      return;
+    }
+    if (lastSavedAt) {
+      const time = new Date(lastSavedAt).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      node.textContent = '已保存 ' + time + ' · 数据只存在这台设备的浏览器里';
+    }
+  }
+
   function persist() {
     clearTimeout(saveTimer);
+    savePending = true;
+    updateSaveStatus();
     saveTimer = setTimeout(() => {
       const ok = saveState(state);
-      if (!ok && !saveFailed) {
+      savePending = false;
+      if (ok) {
+        lastSavedAt = Date.now();
+      } else if (!saveFailed) {
         saveFailed = true;
         toast('本地保存失败（可能是隐私模式），本次修改仅在当前页面有效');
       }
+      updateSaveStatus();
+      if (ok) maybeSnapshot(false);
     }, 250);
+  }
+
+  /* ---------------------------- 历史版本（快照） ---------------------------- */
+
+  const SNAPSHOT_INTERVAL = 10 * 60 * 1000; // 编辑过程中最多 10 分钟存一份
+  const SNAPSHOT_STARTUP_GAP = 30 * 60 * 1000; // 隔了半小时再打开，先存一份
+  let lastSnapshotAt = 0;
+
+  function maybeSnapshot(force) {
+    const now = Date.now();
+    if (!force && now - lastSnapshotAt < SNAPSHOT_INTERVAL) return null;
+    const snap = RS.saveSnapshot(state);
+    if (snap) {
+      lastSnapshotAt = now;
+      renderSnapshots();
+    }
+    return snap;
+  }
+
+  function snapshotTime(at) {
+    return new Date(at).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function renderSnapshots() {
+    if (!el.snapList) return;
+    const list = RS.listSnapshots();
+    if (!list.length) {
+      el.snapList.innerHTML = '<li class="snap-empty">还没有历史版本，继续编辑会自动备份</li>';
+      return;
+    }
+    el.snapList.innerHTML = list
+      .map(
+        (snap) => `
+      <li class="snap-row">
+        <span class="snap-time">${escHtml(snapshotTime(snap.at))}</span>
+        <span class="snap-title">${escHtml(snap.title || '未命名简历')}</span>
+        <span class="snap-tools">
+          <button class="btn btn-sm btn-ghost" type="button" data-restore="${snap.id}">恢复</button>
+          <button class="icon-btn icon-btn--danger" type="button" data-snap-del="${snap.id}"
+                  title="删除这个版本" aria-label="删除这个版本">✕</button>
+        </span>
+      </li>`
+      )
+      .join('');
+  }
+
+  async function restoreSnapshot(id) {
+    const snap = RS.listSnapshots().find((s) => s.id === id);
+    if (!snap) return;
+    const when = snapshotTime(snap.at);
+    if (!(await askConfirm('用 ' + when + ' 的版本覆盖当前简历？当前内容会先自动备份一份。', '恢复'))) return;
+
+    // 覆盖前先给"现在"存一份，万一恢复错了还能回来
+    RS.saveSnapshot(state);
+    const restored = RS.normalizeResume(snap.resume);
+    restored.id = activeResume().id;
+    const index = state.resumes.findIndex((r) => r.id === state.activeId);
+    if (index === -1) return;
+    state.resumes[index] = restored;
+    resetHistory();
+    persist();
+    paintEditor();
+    renderPreview();
+    renderResumeList();
+    closeDialog();
+    toast('已恢复到 ' + when);
   }
 
   /* ---------------------------- 预览 ---------------------------- */
@@ -243,6 +348,7 @@
     const o = options || {};
     renderEditor(el.editor, activeResume(), state.lang);
     renderOrderDialog();
+    updateSaveStatus();
     if (o.focusSelector) {
       const target = el.editor.querySelector(o.focusSelector);
       if (target) {
@@ -1315,6 +1421,7 @@
 
   function openDialog() {
     renderResumeList();
+    renderSnapshots();
     el.resumeDialog.showModal();
   }
 
@@ -1481,6 +1588,20 @@
       else if (del) deleteResume(del.dataset.del);
     });
 
+    // 历史版本：恢复 / 删除
+    if (el.snapList) {
+      el.snapList.addEventListener('click', (event) => {
+        const restore = event.target.closest('[data-restore]');
+        const remove = event.target.closest('[data-snap-del]');
+        if (restore) restoreSnapshot(restore.dataset.restore);
+        else if (remove) {
+          RS.deleteSnapshot(remove.dataset.snapDel);
+          renderSnapshots();
+          toast('已删除这个历史版本');
+        }
+      });
+    }
+
     // 站内确认框
     el.btnConfirmOk.addEventListener('click', () => settleConfirm(true));
     el.btnConfirmCancel.addEventListener('click', () => settleConfirm(false));
@@ -1625,6 +1746,21 @@
 
     paintEditor();
     renderPreview();
+
+    /* ---------- 保存状态 / 持久化授权 / 启动快照 ---------- */
+    updateSaveStatus();
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {
+        /* 不支持或被拒绝都无所谓，只是更容易被浏览器清理 */
+      });
+    }
+    const startSnaps = RS.listSnapshots();
+    lastSnapshotAt = startSnaps.length ? startSnaps[0].at : 0;
+    if (Date.now() - lastSnapshotAt > SNAPSHOT_STARTUP_GAP) {
+      RS.saveSnapshot(state);
+      lastSnapshotAt = Date.now();
+    }
+    renderSnapshots();
 
     // 支持 ?view=preview 直接打开预览（方便分享链接 / 截图 / 手机主屏快捷方式）
     const preferredView = new URLSearchParams(location.search).get('view');

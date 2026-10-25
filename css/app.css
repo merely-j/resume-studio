@@ -1129,6 +1129,67 @@ body {
   margin: 6px 0 0;
 }
 
+/* 历史版本列表 */
+.snap-heading {
+  margin: 16px 0 8px;
+}
+
+.snap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+.snap-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.snap-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.snap-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snap-tools {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.snap-empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#saveStatus.is-error {
+  color: var(--danger);
+}
+
 /* 版本号 + 检查更新 */
 .sheet-foot--between {
   justify-content: space-between;

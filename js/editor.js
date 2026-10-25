@@ -200,7 +200,7 @@
         value: resume.title,
         placeholder: '例如：陈晓 · 产品经理',
       })}
-      <p class="doc-meta">最近修改 ${esc(updated)} · 修改会自动保存在本机</p>
+      <p class="doc-meta" id="saveStatus">最近修改 ${esc(updated)} · 修改会自动保存在本机</p>
     </div>`;
   }
 

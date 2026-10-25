@@ -160,8 +160,80 @@
     return normalize(resume);
   }
 
+  /* ---------------------------- 本机历史版本（快照） ---------------------------- */
+
+  const SNAP_KEY = 'resume-app.snapshots.v1';
+  const SNAP_LIMIT = 6;
+  const SNAP_MAX_BYTES = 2.5 * 1024 * 1024; // 照片会让快照变大，超了就丢最旧的
+
+  function listSnapshots() {
+    try {
+      const raw = localStorage.getItem(SNAP_KEY);
+      const list = JSON.parse(raw);
+      return Array.isArray(list) ? list : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function writeSnapshots(list) {
+    try {
+      localStorage.setItem(SNAP_KEY, JSON.stringify(list));
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /** 给当前简历存一份快照；和上一份完全相同就不重复存 */
+  function saveSnapshot(state) {
+    const active = (state.resumes || []).find((r) => r.id === state.activeId);
+    if (!active) return null;
+
+    const resume = JSON.parse(JSON.stringify(active));
+    const list = listSnapshots();
+    if (list[0] && JSON.stringify(list[0].resume) === JSON.stringify(resume)) return null;
+
+    const snap = {
+      // 同一毫秒内连续存多份时，单靠时间戳会撞 id，加随机后缀
+      id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      at: Date.now(),
+      title: active.title || '未命名简历',
+      resume: resume,
+    };
+    list.unshift(snap);
+
+    while (list.length > SNAP_LIMIT) list.pop();
+    let ok = writeSnapshots(list);
+    while (!ok && list.length > 1) {
+      list.pop();
+      ok = writeSnapshots(list);
+    }
+    void SNAP_MAX_BYTES;
+    return ok ? snap : null;
+  }
+
+  function deleteSnapshot(id) {
+    const list = listSnapshots().filter((s) => s.id !== id);
+    writeSnapshots(list);
+    return list;
+  }
+
+  function clearSnapshots() {
+    try {
+      localStorage.removeItem(SNAP_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
   RS.loadState = loadState;
   RS.saveState = saveState;
   RS.exportJson = exportJson;
   RS.importJson = importJson;
+  RS.normalizeResume = normalize;
+  RS.listSnapshots = listSnapshots;
+  RS.saveSnapshot = saveSnapshot;
+  RS.deleteSnapshot = deleteSnapshot;
+  RS.clearSnapshots = clearSnapshots;
 })();

@@ -339,6 +339,33 @@ check('JSON 导出后能原样导入', () => {
   assert.equal(restored.experience[0].company, sample.experience[0].company);
 });
 
+check('历史版本：能存、能去重、有上限、能删', () => {
+  RS.clearSnapshots();
+  const resume = sampleResume();
+  const state = { resumes: [resume], activeId: resume.id };
+
+  const first = RS.saveSnapshot(state);
+  assert.ok(first, '第一次应该存成功');
+  assert.equal(RS.saveSnapshot(state), null, '内容没变不应该重复存');
+
+  resume.basics.name = '李雷';
+  assert.ok(RS.saveSnapshot(state), '内容变了要存一份新的');
+
+  for (let i = 0; i < 10; i += 1) {
+    resume.basics.name = '名字' + i;
+    RS.saveSnapshot(state);
+  }
+  const list = RS.listSnapshots();
+  assert.ok(list.length <= 6, '最多保留 6 份，实际 ' + list.length);
+
+  const afterDelete = RS.deleteSnapshot(list[0].id);
+  assert.equal(afterDelete.length, list.length - 1);
+
+  assert.ok(RS.normalizeResume(list[0].resume).basics, '快照能还原成一份简历');
+  RS.clearSnapshots();
+  assert.equal(RS.listSnapshots().length, 0);
+});
+
 check('英文稿不残留任何中文', () => {
   const resume = sampleResume();
   // 完全不翻译时：纸面上不应该出现一个汉字

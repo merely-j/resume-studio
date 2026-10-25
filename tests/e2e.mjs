@@ -1193,6 +1193,55 @@ async function main() {
     JSON.stringify(customJumpResult)
   );
 
+  // 保存状态 + 历史版本
+  const saveStatus = await evaluate(
+    client,
+    `(() => {
+       const input = document.querySelector('[data-bind="basics.name"]');
+       input.value = '保存状态测试';
+       input.dispatchEvent(new Event('input', { bubbles: true }));
+       return document.getElementById('saveStatus').textContent;
+     })()`
+  );
+  await sleep(700);
+  const savedStatus = await evaluate(client, `document.getElementById('saveStatus').textContent`);
+  record('保存后顶部显示"已保存 + 时间"', /已保存/.test(savedStatus), savedStatus);
+
+  const snapUi = await evaluate(
+    client,
+    `(() => {
+       document.getElementById('btnResumes').click();
+       const rows = [...document.querySelectorAll('#snapList .snap-row')];
+       return { rows: rows.length, hasRestore: rows.length ? !!rows[0].querySelector('[data-restore]') : false };
+     })()`
+  );
+  record('我的简历里有历史版本可恢复', snapUi.rows >= 1 && snapUi.hasRestore, `rows=${snapUi.rows}`);
+
+  const restored = await evaluate(
+    client,
+    `(() => {
+       const btn = document.querySelector('#snapList [data-restore]');
+       const snapshotName = btn.closest('.snap-row').querySelector('.snap-title').textContent;
+       btn.click();
+       const confirmOpen = document.getElementById('confirmDialog').open;
+       document.getElementById('btnConfirmOk').click();
+       return { snapshotName, confirmOpen };
+     })()`
+  );
+  await sleep(700);
+  const afterRestore = await evaluate(
+    client,
+    `(() => ({
+       toast: document.getElementById('toast').textContent,
+       name: (document.querySelector('[data-bind="basics.name"]') || {}).value,
+     }))()`
+  );
+  record(
+    '历史版本能恢复',
+    restored.confirmOpen === true && afterRestore.toast.indexOf('已恢复') !== -1,
+    `确认框=${restored.confirmOpen} 提示="${afterRestore.toast}" 姓名=${afterRestore.name}`
+  );
+
   client.ws.close();
 
   for (const r of results) {
