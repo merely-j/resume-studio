@@ -1377,8 +1377,9 @@ async function main() {
     });
 
     let parsed = false;
-    for (let i = 0; i < 40; i += 1) {
-      await sleep(400);
+    // 线上首次要下载 pdf.js（1.5MB，GitHub Pages 慢），多等一会儿
+    for (let i = 0; i < 200; i += 1) {
+      await sleep(500);
       parsed = await evaluate(client, `!document.getElementById('importReview').hidden`);
       if (parsed) break;
     }

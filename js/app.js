@@ -246,6 +246,12 @@
   function openImportDialog() {
     importState = null;
     closeDialog();
+    // 提前下载 pdf.js（约 1.5MB），等用户选完文件多半已经就绪
+    if (RS.pdfImport && RS.pdfImport.prefetch) {
+      RS.pdfImport.prefetch().catch(() => {
+        /* 忽略：真正解析时还会重试 */
+      });
+    }
     el.importPick.hidden = false;
     el.importLoading.hidden = true;
     el.importReview.hidden = true;
@@ -265,7 +271,10 @@
     el.importPick.hidden = true;
     el.importReview.hidden = true;
     el.importLoading.hidden = false;
-    el.importLoadingText.textContent = '正在读取 PDF…';
+    el.importLoadingText.textContent =
+      RS.pdfImport && !RS.pdfImport.isReady()
+        ? '首次导入要先下载解析组件（约 1.5MB），请稍候…'
+        : '正在读取 PDF…';
     el.btnImportConfirm.disabled = true;
 
     try {

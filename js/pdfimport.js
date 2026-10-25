@@ -590,6 +590,27 @@
     loadPdfjs,
     extractLines,
     buildResume,
+
+    /** pdf.js 是否已经就绪（没就绪说明首次导入要先下载解析组件） */
+    isReady() {
+      return !!window.pdfjsLib;
+    },
+
+    /**
+     * 后台预取 pdf.js（约 1.5MB，GitHub Pages 上首次要几十秒）。
+     * 在用户打开导入弹窗时就先下，等他选完文件多半已经好了。
+     */
+    async prefetch() {
+      try {
+        await loadPdfjs();
+        // 顺便把 worker 也拉进缓存，真正解析时不用再等
+        await fetch(PDFJS_WORKER, { cache: 'force-cache' }).catch(() => {});
+        return true;
+      } catch (err) {
+        console.warn('[pdf] 解析组件预取失败，导入时会重试', err);
+        return false;
+      }
+    },
     /** 完整流程：ArrayBuffer → { resume, warnings, lines, numPages } */
     async parse(buffer) {
       const { lines, numPages } = await extractLines(buffer);
