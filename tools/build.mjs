@@ -91,6 +91,16 @@ async function buildWeb() {
   for (const item of ['index.html', 'manifest.webmanifest', 'sw.js', 'css', 'js', 'assets']) {
     await cp(join(root, item), join(target, item), { recursive: true });
   }
+
+  // 给 css/js 的引用加上版本号：发版后 URL 变化，浏览器/Service Worker 不会再用旧缓存，
+  // 用户刷新一次就能拿到新代码（否则要刷两次）。
+  const built = await readFile(join(target, 'index.html'), 'utf8');
+  const version = (/<meta name="app-version" content="([^"]+)"/.exec(built) || [])[1] || 'dev';
+  const stamped = built
+    .replace(/href="\.\/css\/([^"]+?)\.css"/g, `href="./css/$1.css?v=${version}"`)
+    .replace(/src="\.\/js\/([^"]+?)\.js"/g, `src="./js/$1.js?v=${version}"`);
+  await writeFile(join(target, 'index.html'), stamped, 'utf8');
+
   return target;
 }
 

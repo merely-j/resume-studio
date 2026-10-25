@@ -7,7 +7,7 @@
  * 改完代码要让用户看到更新，把 CACHE 名字加个版本号即可（必要时引导刷新）。
  */
 
-const CACHE = 'resume-app-v0.3.7';
+const CACHE = 'resume-app-v0.3.8';
 
 const ASSETS = [
   './',
@@ -59,6 +59,29 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // 脚本和样式走"网络优先"：保证发版后刷新一次就能拿到新代码，
+  // 离线时再退回缓存。之前用纯 cache-first，改完推送了用户还看到旧界面。
+  const isCode =
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    /\.(?:m?js|css)$/i.test(url.pathname);
+
+  if (isCode) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        // 离线时忽略 ?v= 版本参数，匹配预缓存的那一份
+        .catch(() => caches.match(request, { ignoreSearch: true }))
     );
     return;
   }

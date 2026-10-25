@@ -14,6 +14,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+    <meta name="app-version" content="0.3.8" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
@@ -155,6 +156,10 @@
           <button class="btn btn-primary" id="btnCreateResume" type="button">新建</button>
         </div>
         <ul class="resume-list" id="resumeList"></ul>
+      </div>
+      <div class="sheet-foot sheet-foot--between">
+        <span class="version-text">版本 <span id="appVersion">—</span></span>
+        <button class="btn btn-ghost" id="btnCheckUpdate" type="button">检查更新</button>
       </div>
     </dialog>
 

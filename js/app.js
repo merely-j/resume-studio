@@ -49,6 +49,7 @@
     resumeDialog: document.getElementById('resumeDialog'),
     resumeList: document.getElementById('resumeList'),
     newName: document.getElementById('newResumeName'),
+    appVersion: document.getElementById('appVersion'),
     confirmDialog: document.getElementById('confirmDialog'),
     confirmText: document.getElementById('confirmText'),
     btnConfirmOk: document.getElementById('btnConfirmOk'),
@@ -935,7 +936,11 @@
     const order = normalizeSectionOrder(resume);
     const from = order.indexOf(sectionId);
     const to = from + dir;
-    if (from === -1 || to < 0 || to >= order.length) return;
+    if (from === -1) return;
+    if (to < 0 || to >= order.length) {
+      toast(dir < 0 ? '已经在最上面了' : '已经在最下面了');
+      return;
+    }
     const tmp = order[from];
     order[from] = order[to];
     order[to] = tmp;
@@ -1426,6 +1431,31 @@
     document.getElementById('btnCloseDialog').addEventListener('click', closeDialog);
     document.getElementById('btnCreateResume').addEventListener('click', createResume);
 
+    // 版本号 + 检查更新：排查"改了没生效"时，先看这里显示的是不是最新版
+    const versionMeta = document.querySelector('meta[name="app-version"]');
+    const appVersion = versionMeta ? versionMeta.content : '—';
+    if (el.appVersion) el.appVersion.textContent = appVersion;
+    console.log('[简历工坊] 版本 ' + appVersion);
+    const btnCheckUpdate = document.getElementById('btnCheckUpdate');
+    if (btnCheckUpdate) {
+      btnCheckUpdate.addEventListener('click', async () => {
+        btnCheckUpdate.textContent = '更新中…';
+        try {
+          if (window.caches) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+          }
+          if (navigator.serviceWorker) {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) await reg.update();
+          }
+        } catch (err) {
+          /* 清缓存失败也继续刷新 */
+        }
+        location.reload();
+      });
+    }
+
     el.newName.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') createResume();
     });
@@ -1568,7 +1598,6 @@
         toast('已保存');
         return;
       }
-
       // 撤销 / 恢复：光标在输入框里时交给浏览器做原生撤销，避免抢掉"退一个字"的直觉
       if (key === 'z' || key === 'y') {
         const active = document.activeElement;

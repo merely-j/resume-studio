@@ -1129,6 +1129,17 @@ body {
   margin: 6px 0 0;
 }
 
+/* 版本号 + 检查更新 */
+.sheet-foot--between {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.version-text {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* 模块顺序面板：复用左侧原来的列表样式 */
 .sheet--order {
   width: min(420px, calc(100vw - 40px));
