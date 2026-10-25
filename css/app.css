@@ -6,6 +6,11 @@
    3. 输入框统一 16px 字号 —— iOS Safari 对 <16px 的输入框会自动放大页面
    ========================================================================== */
 
+/* 作者样式里的 display:flex 会盖掉浏览器默认的 [hidden]，这里强制一下 */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --bg: #f6f7fb;
   --canvas: #eceff6;
@@ -1127,6 +1132,135 @@ body {
 
 .key-guide p {
   margin: 6px 0 0;
+}
+
+/* ------------------------------ 导入 PDF ------------------------------ */
+
+.sheet--import {
+  width: min(880px, calc(100vw - 32px));
+}
+
+.import-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-tip {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.import-loading {
+  padding: 28px 4px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.import-warnings {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #92400e;
+}
+
+.import-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.import-col {
+  min-width: 0;
+}
+
+.import-raw {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 38vh;
+  overflow: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.import-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 38vh;
+  overflow: auto;
+}
+
+.import-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.import-row b {
+  font-weight: 600;
+  flex: none;
+}
+
+.import-row span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+.import-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-span {
+  flex: 1;
+}
+
+.import-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .import-cols,
+  .import-options {
+    grid-template-columns: 1fr;
+  }
+
+  .import-raw,
+  .import-summary {
+    max-height: 26vh;
+  }
 }
 
 /* 历史版本列表 */

@@ -88,7 +88,15 @@ async function buildSingleFile(options = {}) {
 
 async function buildWeb() {
   const target = join(dist, 'web');
-  for (const item of ['index.html', 'manifest.webmanifest', 'sw.js', 'css', 'js', 'assets']) {
+  for (const item of [
+    'index.html',
+    'manifest.webmanifest',
+    'sw.js',
+    'css',
+    'js',
+    'assets',
+    'vendor',
+  ]) {
     await cp(join(root, item), join(target, item), { recursive: true });
   }
 

@@ -1,0 +1,595 @@
+/**
+ * PDF 导入：把一份简历 PDF 拆成我们的结构化数据
+ * ------------------------------------------------------------
+ * 关键认知：PDF 里没有"公司/职位"这种结构，只有一堆带坐标的文字。
+ * 所以这里做的是"切分与归类"，不是"改写"：
+ *   · 用户写的是什么就保留什么（列表符号、换行、日期写法都不动）
+ *   · 认不出归属的内容，放进"其他"模块，绝不丢弃
+ *
+ * pdf.js 体积约 1.5MB，只在用户点「导入 PDF」时才按需加载。
+ */
+
+(function () {
+  'use strict';
+
+  const RS = (window.RS = window.RS || {});
+
+  const PDFJS_SRC = './vendor/pdfjs/pdf.min.js';
+  const PDFJS_WORKER = './vendor/pdfjs/pdf.worker.min.js';
+
+  let pdfjsLoading = null;
+
+  /** 按需加载 pdf.js（只加载一次） */
+  function loadPdfjs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (pdfjsLoading) return pdfjsLoading;
+
+    pdfjsLoading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = PDFJS_SRC;
+      script.onload = () => {
+        if (!window.pdfjsLib) {
+          reject(new Error('pdf.js 加载后没有初始化'));
+          return;
+        }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        resolve(window.pdfjsLib);
+      };
+      script.onerror = () => reject(new Error('pdf.js 加载失败（可能是离线且未缓存）'));
+      document.head.appendChild(script);
+    });
+    return pdfjsLoading;
+  }
+
+  /* ---------------------------- 文本归一化 ---------------------------- */
+
+  /**
+   * 很多 PDF 用"部首字符"来编码汉字：⼯(U+2F2F)、⽤(U+2F64)、⻓(U+2ED3)…
+   * 它们看着和「工/用/长」一模一样，但码位不同，用户复制出来是怪字符，
+   * 标题匹配也会失败。NFKC 能修好康熙部首区（U+2F00–2FDF），
+   * 但部首补充区（U+2E80–2EFF）不在标准分解里，得自己补一张表。
+   */
+  const RADICAL_FIX = {
+    '\u2E80': '一', '\u2E81': '丨', '\u2E82': '丶', '\u2E83': '丿', '\u2E84': '乙',
+    '\u2E85': '亅', '\u2E86': '二', '\u2E87': '亠', '\u2E88': '人', '\u2E89': '儿',
+    '\u2E8A': '入', '\u2E8B': '八', '\u2E8C': '冂', '\u2E8D': '冖', '\u2E8E': '冫',
+    '\u2E8F': '几', '\u2E90': '凵', '\u2E91': '刀', '\u2E92': '刂', '\u2E93': '力',
+    '\u2E94': '勹', '\u2E95': '匕', '\u2E96': '匚', '\u2E97': '匸', '\u2E98': '十',
+    '\u2E99': '卜', '\u2E9B': '卩', '\u2E9C': '厂', '\u2E9D': '厶', '\u2E9E': '又',
+    '\u2E9F': '母', '\u2EA0': '民', '\u2EA1': '氵', '\u2EA2': '水', '\u2EA3': '火',
+    '\u2EA4': '灬', '\u2EA5': '爪', '\u2EA6': '父', '\u2EA7': '爻', '\u2EA8': '爿',
+    '\u2EA9': '片', '\u2EAA': '牙', '\u2EAB': '牛', '\u2EAC': '犬', '\u2EAD': '玄',
+    '\u2EAE': '玉', '\u2EAF': '瓜', '\u2EB0': '瓦', '\u2EB1': '甘', '\u2EB2': '生',
+    '\u2EB3': '用', '\u2EB4': '田', '\u2EB5': '疋', '\u2EB6': '疒', '\u2EB7': '癶',
+    '\u2EB8': '白', '\u2EB9': '皮', '\u2EBA': '皿', '\u2EBB': '目', '\u2EBC': '矛',
+    '\u2EBD': '矢', '\u2EBE': '石', '\u2EBF': '示', '\u2EC0': '禸', '\u2EC1': '禾',
+    '\u2EC2': '穴', '\u2EC3': '立', '\u2EC4': '竹', '\u2EC5': '米', '\u2EC6': '糸',
+    '\u2EC7': '缶', '\u2EC8': '网', '\u2EC9': '羊', '\u2ECA': '羽', '\u2ECB': '老',
+    '\u2ECC': '而', '\u2ECD': '耒', '\u2ECE': '耳', '\u2ECF': '聿', '\u2ED0': '肉',
+    '\u2ED1': '臣', '\u2ED2': '自', '\u2ED3': '长', '\u2ED4': '至', '\u2ED5': '臼',
+    '\u2ED6': '舌', '\u2ED7': '舛', '\u2ED8': '舟', '\u2ED9': '艮', '\u2EDA': '色',
+    '\u2EDB': '艸', '\u2EDC': '虍', '\u2EDD': '虫', '\u2EDE': '血', '\u2EDF': '行',
+    '\u2EE0': '衣', '\u2EE1': '襾', '\u2EE2': '见', '\u2EE3': '角', '\u2EE4': '言',
+    '\u2EE5': '谷', '\u2EE6': '豆', '\u2EE7': '豕', '\u2EE8': '豸', '\u2EE9': '贝',
+    '\u2EEA': '赤', '\u2EEB': '走', '\u2EEC': '足', '\u2EED': '身', '\u2EEE': '车',
+    '\u2EEF': '辛', '\u2EF0': '辰', '\u2EF1': '辵', '\u2EF2': '邑', '\u2EF3': '酉',
+    '\u2EF4': '釆', '\u2EF5': '里', '\u2EF6': '金', '\u2EF7': '长', '\u2EF8': '门',
+    '\u2EF9': '阜', '\u2EFA': '隶', '\u2EFB': '隹', '\u2EFC': '雨', '\u2EFD': '靑',
+    '\u2EFE': '非', '\u2EFF': '面',
+  };
+
+  /** NFKC 之后仍有少数会还原成繁体（如「戶」），按简体修一下 */
+  const TRADITIONAL_FIX = {
+    戶: '户',
+    見: '见',
+    頁: '页',
+    長: '长',
+    風: '风',
+    門: '门',
+    馬: '马',
+    車: '车',
+    貝: '贝',
+    魚: '鱼',
+    鳥: '鸟',
+    龍: '龙',
+    齊: '齐',
+    齒: '齿',
+    黃: '黄',
+  };
+
+  function normalizeText(value) {
+    const src = String(value == null ? '' : value);
+    let out = '';
+    for (const ch of src) {
+      const code = ch.codePointAt(0);
+      if (code >= 0x2e80 && code <= 0x2eff) {
+        // 部首补充区：NFKC 覆盖不到，用自己的表
+        out += RADICAL_FIX[ch] || ch;
+      } else if (code >= 0x2f00 && code <= 0x2fdf) {
+        // 康熙部首区：NFKC 能修，但它会顺手把全角标点改成半角，
+        // 所以这里只对"部首字符"逐个做 NFKC，其余字符原样保留
+        const fixed = ch.normalize('NFKC');
+        out += TRADITIONAL_FIX[fixed] || fixed;
+      } else {
+        out += TRADITIONAL_FIX[ch] || ch;
+      }
+    }
+    return out;
+  }
+
+  /** 归一化之后还剩非标准部首字符 → 这份 PDF 的字体编码不正常，给用户提个醒 */
+  function hasBrokenGlyphs(text) {
+    return /[\u2E80-\u2FDF]/.test(text);
+  }
+
+  /* ---------------------------- 文本提取 ---------------------------- */
+
+  /**
+   * 把 PDF 拆成"行"：同一基线上的文字片段拼成一行。
+   * 顺便做 NFKC 归一化 —— 很多 PDF 用康熙部首编码（⼯/⻓/⽤），
+   * 看着一样但不是同一个字，不归一化会让用户复制出来都是怪字符。
+   */
+  async function extractLines(buffer) {
+    const pdfjsLib = await loadPdfjs();
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const lines = [];
+    const pages = [];
+
+    for (let p = 1; p <= doc.numPages; p += 1) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      const pageLines = [];
+      let current = null;
+
+      content.items.forEach((item) => {
+        if (!item.str) return;
+        const y = Math.round(item.transform[5]);
+        const x = Math.round(item.transform[4]);
+        const size = Math.round(Math.hypot(item.transform[2], item.transform[3]) * 10) / 10;
+
+        if (current && Math.abs(current.y - y) <= 3) {
+          current.spans.push({ x, str: item.str, size });
+          current.text += item.str;
+        } else {
+          current = { y, x, size, text: item.str, spans: [{ x, str: item.str, size }] };
+          pageLines.push(current);
+        }
+      });
+
+      pageLines.forEach((line) => {
+        const text = normalizeText(line.text).replace(/\s+/g, ' ').trim();
+        if (!text) return;
+        lines.push({ text, x: line.x, y: line.y, size: line.size, page: p });
+      });
+      pages.push({ page: p, width: page.view[2], height: page.view[3] });
+    }
+
+    return { lines, pages, numPages: doc.numPages };
+  }
+
+  /** 视觉上连续的两行合并成一段（同字号、同缩进、上一行没以句号结尾） */
+  function mergeParagraphs(lines) {
+    const out = [];
+    const bodySize = median(lines.map((l) => l.size)) || 10;
+
+    // 左边距出现最多的那个 x，就是正文的左边界；
+    // 缩进更多的一般是项目符号，绝不能和上一行合并，否则两条要点会粘成一句
+    const counts = {};
+    lines.forEach((l) => {
+      counts[l.x] = (counts[l.x] || 0) + 1;
+    });
+    const leftMargin = Number(
+      Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || lines[0].x
+    );
+
+    lines.forEach((line) => {
+      const prev = out[out.length - 1];
+      const canMerge =
+        prev &&
+        prev.x === leftMargin &&
+        line.x === leftMargin &&
+        !/\d{4}\s*[-./年]/.test(prev.text) &&
+        Math.abs(prev.size - line.size) < 0.6 &&
+        prev.size <= bodySize + 0.4 &&
+        line.size <= bodySize + 0.4 &&
+        !/[。！？：:；;.]$/.test(prev.text) &&
+        prev.y - line.y > 0 &&
+        prev.y - line.y < line.size * 1.7;
+      if (canMerge) {
+        prev.text += line.text;
+      } else {
+        out.push(Object.assign({}, line));
+      }
+    });
+    return out;
+  }
+
+  function median(nums) {
+    if (!nums.length) return 0;
+    const sorted = nums.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  }
+
+  /* ---------------------------- 规则表 ---------------------------- */
+
+  const SECTION_PATTERNS = [
+    { id: 'summary', re: /^(个人简介|自我评价|个人总结|个人优势|简介|Summary|Profile|About Me|Objective)$/i },
+    { id: 'experience', re: /^(工作经历|工作经验|职业经历|实习经历|Experience|Work Experience|Employment|Work History)$/i },
+    { id: 'projects', re: /^(项目经历|项目经验|主要项目|Projects|Project Experience)$/i },
+    { id: 'education', re: /^(教育背景|教育经历|学历背景|Education|Education Background)$/i },
+    { id: 'skills', re: /^(技能|技能与特长|专业技能|技术技能|Skills|Technical Skills)$/i },
+    { id: 'certs', re: /^(资格证书|证书|认证|资质|Certifications?|Certificates?)$/i },
+    { id: 'awards', re: /^(荣誉|获奖经历|奖项|Awards|Honors)$/i },
+    { id: 'other', re: /^(其它|其他|语言|语言能力|兴趣爱好|Other|Others|Languages|Interests)$/i },
+  ];
+
+  const DATE_RANGE =
+    /((?:19|20)\d{2}\s*[-./年]\s*\d{1,2}\s*月?)\s*[-–—~～至到]\s*((?:19|20)\d{2}\s*[-./年]\s*\d{1,2}\s*月?|至今|现在|目前|今|Present|present|Now)/;
+
+  const ROLE_WORDS =
+    /(经理|总监|主管|专员|工程师|设计师|开发|运营|产品|架构师|分析师|顾问|助理|实习生|负责人|创始人|合伙人|Leader|Manager|Engineer|Designer|Analyst|Director|Lead|Intern|Consultant|Specialist)/i;
+
+  const DEGREE_WORDS = /(本科|硕士|博士|大专|专科|高中|MBA|B\.?S\.?|M\.S\.?|Ph\.?D|Bachelor|Master|Doctor)/i;
+
+  /* ---------------------------- 解析主体 ---------------------------- */
+
+  function splitTokens(text) {
+    return String(text || '')
+      .split(/[\s、,，;；|]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  /** 有些词内部带空格（Google Analytics / A/B 测试），拆开后要合回去 */
+  const BRAND_WORDS = /^(Google|Adobe|Microsoft|Amazon|Meta|Apple|Data|Machine|Deep|Auto|New|Sales|Table|Power)/i;
+
+  function splitSkillTags(text) {
+    const tokens = splitTokens(text);
+    const merged = [];
+    tokens.forEach((token, i) => {
+      const prev = merged[merged.length - 1];
+      if (prev && BRAND_WORDS.test(prev) && /^[A-Za-z]/.test(token)) {
+        merged[merged.length - 1] = prev + ' ' + token;
+        return;
+      }
+      merged.push(token);
+    });
+    return merged;
+  }
+
+  /** 从一行里找出联系方式 */
+  function extractContact(text) {
+    const rest = String(text || '').replace(/\s+/g, ' ').trim();
+    const found = { email: '', phone: '', links: [], city: '' };
+
+    const emailMatch = rest.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/);
+    if (emailMatch) found.email = emailMatch[0];
+
+    const phoneMatch = rest.match(/(?:\+?86[-\s]?)?1[3-9]\d[-\s]?\d{4}[-\s]?\d{4}|\+?\d[\d\s-]{7,}\d/);
+    const phoneRaw = phoneMatch ? phoneMatch[0] : '';
+    if (phoneMatch) found.phone = phoneMatch[0].replace(/[^\d+]/g, '');
+
+    // 先把邮箱从原文里挖掉，否则 "zhangzhe@email.com" 会被当成网址 "email.com"
+    const withoutEmail = found.email ? rest.replace(found.email, ' ') : rest;
+    const linkRe = /(?:https?:\/\/)?(?:www\.)?(?:[\w-]+\.)+(?:com|cn|net|io|me|dev|org|co|xyz|top)(?:\/[\w./#?=-]*)?/gi;
+    (withoutEmail.match(linkRe) || []).forEach((link) => {
+      if (found.links.indexOf(link) === -1) found.links.push(link);
+    });
+
+    const cityMatch = rest.match(/(?:北京|上海|广州|深圳|杭州|成都|南京|武汉|西安|苏州|天津|重庆|长沙|郑州|青岛|厦门|福州|合肥|济南|大连|宁波|无锡|珠海|东莞|佛山)(?:市)?(?:[\u4e00-\u9fa5]{2,6}区)?/);
+    if (cityMatch) found.city = cityMatch[0];
+
+    // 剩下的零碎（比如"男 / 25岁"）先留着，交给"其他"模块，不丢
+    let leftover = rest;
+    [found.email, phoneRaw, found.city, ...found.links].forEach((piece) => {
+      if (!piece) return;
+      leftover = leftover.split(piece).join(' ');
+    });
+    leftover = leftover.replace(/\s+/g, ' ').trim();
+
+    return { found, leftover };
+  }
+
+  function isHeading(line, bodySize, headingSize) {
+    const text = line.text.replace(/[：:]\s*$/, '');
+    if (line.size >= headingSize - 0.1 && text.length <= 24) return true;
+    if (line.size > bodySize + 0.6 && text.length <= 24) return true;
+    return SECTION_PATTERNS.some((p) => p.re.test(text));
+  }
+
+  function sectionIdFor(title) {
+    const text = String(title || '').replace(/[：:]\s*$/, '');
+    const hit = SECTION_PATTERNS.find((p) => p.re.test(text));
+    return hit ? hit.id : null;
+  }
+
+  /** 解析一条经历/项目的标题行：拆成名称、职位、起止时间 */
+  function splitEntryTitle(text) {
+    const dateMatch = text.match(DATE_RANGE);
+    let head = text;
+    let start = '';
+    let end = '';
+    if (dateMatch) {
+      head = text.slice(0, dateMatch.index).trim();
+      start = dateMatch[1].trim();
+      end = dateMatch[2].trim();
+    }
+
+    let title = head;
+    let sub = '';
+    const sep = head.match(/\s+[-–—|·]\s+|\s*｜\s*|\s*\|\s*/);
+    if (sep) {
+      const parts = head.split(/\s+[-–—|·]\s+|\s*｜\s*|\s*\|\s*/).map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        // 哪个是职位？按关键词判断；都不匹配就按"职位在前"（中文简历常见）
+        if (ROLE_WORDS.test(parts[1]) && !ROLE_WORDS.test(parts[0])) {
+          title = parts[1];
+          sub = parts[0];
+        } else {
+          title = parts[0];
+          sub = parts.slice(1).join(' · ');
+        }
+      }
+    }
+    return { title, sub, start, end };
+  }
+
+  /** 主入口：行 → 结构化简历 */
+  function buildResume(rawLines) {
+    const lines = mergeParagraphs(rawLines).filter((l) => l.text);
+    const warnings = [];
+    const bodySize = median(lines.map((l) => l.size)) || 10;
+    const headingSize = Math.max(...lines.map((l) => l.size)) - 2;
+
+    const resume = {
+      title: '',
+      basics: { name: '', headline: '', phone: '', email: '', city: '', link: '', summary: '' },
+      experience: [],
+      projects: [],
+      education: [],
+      skills: [],
+      extras: [],
+      customSections: [],
+    };
+
+    // 1. 姓名：最上面、字号最大的短行
+    let cursor = 0;
+    const nameCandidate =
+      lines
+        .slice(0, 5)
+        .filter((l) => l.text.length <= 24 && !/@|\d{3,}|\//.test(l.text))
+        .sort((a, b) => b.size - a.size)[0] || null;
+    if (nameCandidate) {
+      resume.basics.name = nameCandidate.text;
+      cursor = lines.indexOf(nameCandidate) + 1;
+    }
+
+    // 2. 联系方式：姓名之后，含 @ 或手机号或网址的第一行
+    for (let i = cursor; i < Math.min(lines.length, cursor + 4); i += 1) {
+      const line = lines[i];
+      if (!/@|1[3-9]\d|https?:|\.(com|cn|net|io)\b/i.test(line.text)) continue;
+      const contact = extractContact(line.text);
+      resume.basics.email = contact.found.email || resume.basics.email;
+      resume.basics.phone = contact.found.phone || resume.basics.phone;
+      resume.basics.city = contact.found.city || resume.basics.city;
+      if (contact.found.links.length) resume.basics.link = contact.found.links.join(' · ');
+      if (contact.leftover) {
+        warnings.push('联系方式里有没识别的片段：' + contact.leftover);
+      }
+      cursor = i + 1;
+      break;
+    }
+
+    // 3. 逐行归类
+    let current = null; // { id, title, lines: [] }
+    const sections = [];
+    const pushSection = (id, title) => {
+      current = { id, title, lines: [] };
+      sections.push(current);
+    };
+
+    for (let i = cursor; i < lines.length; i += 1) {
+      const line = lines[i];
+      const text = line.text;
+
+      // "技术技能：" 这种是模块内的小标题，不是新模块；
+      // 但 "其它：" 这种真的是新模块，不能吞掉
+      const headingId = sectionIdFor(text);
+      const insideSkillSection = current && (current.id === 'skills' || current.id === 'certs');
+      const isSubLabel =
+        /[：:]\s*$/.test(text) &&
+        text.length <= 12 &&
+        insideSkillSection &&
+        (headingId === null || headingId === current.id || /语言/.test(text));
+
+      if (!isSubLabel && isHeading(line, bodySize, headingSize)) {
+        pushSection(headingId, text);
+        continue;
+      }
+
+      if (!current) {
+        // 正文开始前的内容 → 当作简介
+        pushSection('summary', '个人简介');
+      }
+      current.lines.push(line);
+    }
+
+    // 4. 按模块解析
+    sections.forEach((section) => {
+      const body = section.lines;
+      if (section.id === 'summary') {
+        const text = body.map((l) => l.text).join(' ');
+        if (text) resume.basics.summary = resume.basics.summary ? resume.basics.summary + ' ' + text : text;
+        return;
+      }
+
+      if (section.id === 'skills' || section.id === 'certs') {
+        parseSkillsSection(section, resume);
+        return;
+      }
+
+      if (section.id === 'experience' || section.id === 'projects' || section.id === 'education') {
+        parseEntrySection(section, resume);
+        return;
+      }
+
+      // 其他（语言、荣誉、兴趣…）：整段放进自定义模块，文字原样
+      const text = body.map((l) => l.text).filter(Boolean).join('\n');
+      if (!text) return;
+      resume.customSections.push({
+        title: section.title.replace(/[：:]\s*$/, ''),
+        labels: null,
+        items: [{ name: '', role: '', start: '', end: '', desc: text }],
+      });
+    });
+
+    resume.title = resume.basics.name ? resume.basics.name + ' 的简历' : '导入的简历';
+    return { resume, warnings, sections };
+  }
+
+  /** 技能 / 证书段：按"小标题："分组，其余按标签拆 */
+  function parseSkillsSection(section, resume) {
+    // 证书：每一行原样保留（不拆词，避免把证书名字弄碎）
+    if (section.id === 'certs') {
+      section.lines.forEach((line) => {
+        const text = line.text.trim();
+        if (text) resume.extras.push({ label: '', value: text });
+      });
+      return;
+    }
+
+    let subLabel = '';
+    const buckets = [];
+
+    section.lines.forEach((line) => {
+      const text = line.text;
+      const sub = text.match(/^(.{1,12})[:：]\s*(.*)$/);
+      if (sub) {
+        subLabel = sub[1];
+        const rest = sub[2].trim();
+        buckets.push({ label: subLabel, items: rest ? splitSkillTags(rest) : [], raw: rest });
+        return;
+      }
+      if (!buckets.length) buckets.push({ label: subLabel, items: [], raw: '' });
+      const bucket = buckets[buckets.length - 1];
+      splitSkillTags(text).forEach((token) => bucket.items.push(token));
+      bucket.raw = (bucket.raw ? bucket.raw + ' ' : '') + text;
+    });
+
+    buckets.forEach((bucket) => {
+      const isLang = /语言/.test(bucket.label);
+      if (isLang) {
+        // 语言这一行原样保留（里面的逗号、顿号是用户原文）
+        resume.extras.push({ label: '语言', value: (bucket.raw || bucket.items.join(' · ')).trim() });
+        return;
+      }
+      bucket.items.forEach((item) => {
+        if (resume.skills.indexOf(item) === -1) resume.skills.push(item);
+      });
+    });
+  }
+
+  /** 经历 / 项目 / 教育段：按"带日期范围的行"切条目 */
+  function parseEntrySection(section, resume) {
+    const entries = [];
+    let current = null;
+    let bulletX = null;
+
+    section.lines.forEach((line) => {
+      const isDateEntry = DATE_RANGE.test(line.text) && line.size >= median(section.lines.map((l) => l.size)) - 0.6;
+      if (isDateEntry) {
+        current = { head: line.text, lines: [] };
+        entries.push(current);
+        return;
+      }
+      if (!current) {
+        // 第一条没有日期：也当成一个条目，避免丢内容
+        current = { head: line.text, lines: [] };
+        entries.push(current);
+        bulletX = line.x;
+        return;
+      }
+      if (bulletX === null) bulletX = line.x;
+      current.lines.push(line);
+    });
+
+    entries.forEach((entry) => {
+      const info = splitEntryTitle(entry.head);
+      // 条目下的第一行如果是地点（短、无标点），单独拿出来
+      let extraLines = entry.lines.slice();
+      let place = '';
+      if (extraLines.length && extraLines[0].text.length <= 8 && !/[。，,；;]/.test(extraLines[0].text)) {
+        place = extraLines[0].text;
+        extraLines = extraLines.slice(1);
+      }
+      const desc = extraLines.map((l) => l.text).join('<br>');
+
+      if (section.id === 'education') {
+        // 先把日期范围从标题里去掉，否则会混进"学历/专业"里重复一遍
+        const headNoDate = entry.head.replace(DATE_RANGE, ' ').replace(/\s+/g, ' ').trim();
+        const parts = headNoDate.split(/\s*[|｜]\s*|\s+[-–—]\s+/).map((s) => s.trim()).filter(Boolean);
+        const school = parts[0] || info.title;
+        const degreeParts = parts.slice(1).filter((p) => !/^\d{4}/.test(p));
+        resume.education.push({
+          school: school,
+          degree: degreeParts.join(' · ') || info.sub || '',
+          start: info.start,
+          end: info.end,
+          desc: extraLines.map((l) => l.text).join('<br>'),
+        });
+        return;
+      }
+
+      if (section.id === 'projects') {
+        resume.projects.push({
+          name: info.title,
+          role: info.sub,
+          start: info.start,
+          end: info.end,
+          desc: desc,
+        });
+        return;
+      }
+
+      // 工作经历：中文常见"职位 - 公司"，英文常见"公司 - 职位"，都试一遍
+      let company = info.sub;
+      let role = info.title;
+      if (ROLE_WORDS.test(info.sub) && !ROLE_WORDS.test(info.title)) {
+        company = info.title;
+        role = info.sub;
+      }
+      if (!company && !role) {
+        company = entry.head;
+      }
+      resume.experience.push({
+        company: company + (place ? '（' + place + '）' : ''),
+        role: role,
+        start: info.start,
+        end: info.end,
+        desc: desc,
+      });
+    });
+  }
+
+  RS.pdfImport = {
+    loadPdfjs,
+    extractLines,
+    buildResume,
+    /** 完整流程：ArrayBuffer → { resume, warnings, lines, numPages } */
+    async parse(buffer) {
+      const { lines, numPages } = await extractLines(buffer);
+      const result = buildResume(lines);
+      const allText = lines.map((l) => l.text).join('\n');
+      if (hasBrokenGlyphs(allText)) {
+        result.warnings.unshift('这份 PDF 的字体编码不完整，个别字可能显示异常，导入后请检查一遍');
+      }
+      return {
+        resume: result.resume,
+        warnings: result.warnings,
+        lines: lines.map((l) => l.text),
+        numPages: numPages,
+        sections: result.sections.map((s) => ({ id: s.id, title: s.title, count: s.lines.length })),
+      };
+    },
+  };
+})();

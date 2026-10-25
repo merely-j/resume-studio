@@ -12,6 +12,8 @@
  *   APP_URL=file:///D:/ds_workspace/resume-app/index.html node tests/e2e.mjs
  */
 
+import { existsSync } from 'node:fs';
+
 const DEBUG_PORT = process.env.CDP_PORT || 9333;
 const APP_URL = process.env.APP_URL || 'https://merely-j.github.io/resume-studio/';
 
@@ -1241,6 +1243,73 @@ async function main() {
     restored.confirmOpen === true && afterRestore.toast.indexOf('已恢复') !== -1,
     `确认框=${restored.confirmOpen} 提示="${afterRestore.toast}" 姓名=${afterRestore.name}`
   );
+
+  // 导入 PDF：弹窗能打开、能塞文件解析（需要本机有示例 PDF，没有就跳过）
+  const samplePdf = process.env.SAMPLE_PDF || 'D:/浏览器文件下载/张哲.pdf';
+  if (existsSync(samplePdf)) {
+    await evaluate(client, `document.getElementById('btnResumes').click()`);
+    await sleep(300);
+    await evaluate(client, `document.getElementById('btnImportPdf').click()`);
+    await sleep(400);
+
+    const importOpen = await evaluate(client, `document.getElementById('importDialog').open`);
+    await client.send('DOM.enable');
+    const doc = await client.send('DOM.getDocument', { depth: -1 });
+    const node = await client.send('DOM.querySelector', {
+      nodeId: doc.result.root.nodeId,
+      selector: '#pdfFileInput',
+    });
+    await client.send('DOM.setFileInputFiles', {
+      nodeId: node.result.nodeId,
+      files: [samplePdf],
+    });
+
+    let parsed = false;
+    for (let i = 0; i < 40; i += 1) {
+      await sleep(400);
+      parsed = await evaluate(client, `!document.getElementById('importReview').hidden`);
+      if (parsed) break;
+    }
+
+    const importReview = await evaluate(
+      client,
+      `(() => ({
+         rawLines: document.getElementById('importRaw').textContent.split(String.fromCharCode(10)).length,
+         hasName: document.getElementById('importSummary').textContent.indexOf('张哲') !== -1,
+         hasExp: document.getElementById('importSummary').textContent.indexOf('工作经历') !== -1,
+         canImport: !document.getElementById('btnImportConfirm').disabled,
+       }))()`
+    );
+    record(
+      '导入 PDF：解析出姓名与经历',
+      importOpen === true && parsed && importReview.hasName && importReview.hasExp && importReview.canImport,
+      JSON.stringify(importReview)
+    );
+
+    await evaluate(client, `document.getElementById('btnImportConfirm').click()`);
+    await sleep(900);
+    const imported = await evaluate(
+      client,
+      `(() => {
+         const s = JSON.parse(localStorage.getItem('resume-app.v1'));
+         const a = s.resumes.find((r) => r.id === s.activeId);
+         return {
+           resumes: s.resumes.length,
+           name: a.basics.name,
+           exp: a.experience.length,
+           paper: document.getElementById('paper').textContent.indexOf('张哲') !== -1,
+           closed: !document.getElementById('importDialog').open,
+         };
+       })()`
+    );
+    record(
+      '导入后生成新简历并渲染到纸面',
+      imported.resumes >= 2 && imported.name.length > 0 && imported.exp > 0 && imported.paper && imported.closed,
+      JSON.stringify(imported)
+    );
+  } else {
+    console.log('（跳过 PDF 导入测试：本机没有示例 PDF）');
+  }
 
   client.ws.close();
 

@@ -14,7 +14,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
-    <meta name="app-version" content="0.4.0" />
+    <meta name="app-version" content="0.5.0" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
@@ -155,6 +155,7 @@
           <input class="input" id="newResumeName" placeholder="新简历名称，例如：产品经理版" />
           <button class="btn btn-primary" id="btnCreateResume" type="button">新建</button>
         </div>
+        <button class="btn btn-ghost btn-block" id="btnImportPdf" type="button">📄 导入已有 PDF 简历</button>
         <ul class="resume-list" id="resumeList"></ul>
 
         <p class="form-sub snap-heading">历史版本（自动备份，最多 6 份）</p>
@@ -163,6 +164,69 @@
       <div class="sheet-foot sheet-foot--between">
         <span class="version-text">版本 <span id="appVersion">—</span></span>
         <button class="btn btn-ghost" id="btnCheckUpdate" type="button">检查更新</button>
+      </div>
+    </dialog>
+
+    <!-- 导入 PDF：解析 → 确认 → 生成结构化简历 -->
+    <dialog class="sheet sheet--import" id="importDialog" aria-label="导入 PDF">
+      <div class="sheet-head">
+        <h2>导入 PDF 简历</h2>
+        <button class="icon-btn" type="button" data-close-import aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <!-- 初始：选文件 -->
+        <div class="import-pick" id="importPick">
+          <p class="import-tip">
+            支持文字版 PDF（Word / 网页导出的那种）。扫描件、截图做的 PDF 没有文字层，无法导入。
+          </p>
+          <button class="btn btn-primary btn-block" id="btnPickPdf" type="button">选择 PDF 文件</button>
+          <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" hidden />
+          <p class="hint">
+            解析只做「拆分归类」，<b>不会改写你的表述</b>；认不出归属的内容会放进「其他」模块，不会丢。
+          </p>
+        </div>
+
+        <!-- 解析中 -->
+        <div class="import-loading" id="importLoading" hidden>
+          <p id="importLoadingText">正在读取 PDF…</p>
+        </div>
+
+        <!-- 确认 -->
+        <div class="import-review" id="importReview" hidden>
+          <div class="import-warnings" id="importWarnings" hidden></div>
+          <div class="import-cols">
+            <div class="import-col">
+              <p class="form-sub">PDF 原文</p>
+              <pre class="import-raw" id="importRaw"></pre>
+            </div>
+            <div class="import-col">
+              <p class="form-sub">识别出的内容</p>
+              <div class="import-summary" id="importSummary"></div>
+            </div>
+          </div>
+
+          <div class="import-options">
+            <label class="radio-row">
+              <input type="radio" name="importMode" id="importModeNew" value="new" checked />
+              <span><b>新建一份简历</b><em>当前简历不动</em></span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="importMode" id="importModeReplace" value="replace" />
+              <span><b>覆盖当前简历</b><em>当前内容会被替换</em></span>
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field-label">用哪个模板排版</span>
+            <select class="input" id="importTemplate"></select>
+          </label>
+        </div>
+      </div>
+      <div class="sheet-foot import-foot">
+        <button class="btn btn-ghost" type="button" id="btnAiRefine">用 AI 校正结构</button>
+        <span class="import-span"></span>
+        <button class="btn btn-ghost" type="button" data-close-import>取消</button>
+        <button class="btn btn-primary" id="btnImportConfirm" type="button" disabled>导入</button>
       </div>
     </dialog>
 
@@ -406,6 +470,7 @@
     <script src="./js/model.js"></script>
     <script src="./js/store.js"></script>
     <script src="./js/preview.js"></script>
+    <script src="./js/pdfimport.js"></script>
     <script src="./js/editor.js"></script>
     <script src="./js/app.js"></script>
 

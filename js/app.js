@@ -51,6 +51,22 @@
     newName: document.getElementById('newResumeName'),
     appVersion: document.getElementById('appVersion'),
     snapList: document.getElementById('snapList'),
+    importDialog: document.getElementById('importDialog'),
+    btnImportPdf: document.getElementById('btnImportPdf'),
+    btnPickPdf: document.getElementById('btnPickPdf'),
+    pdfFileInput: document.getElementById('pdfFileInput'),
+    importPick: document.getElementById('importPick'),
+    importLoading: document.getElementById('importLoading'),
+    importLoadingText: document.getElementById('importLoadingText'),
+    importReview: document.getElementById('importReview'),
+    importRaw: document.getElementById('importRaw'),
+    importSummary: document.getElementById('importSummary'),
+    importWarnings: document.getElementById('importWarnings'),
+    importModeNew: document.getElementById('importModeNew'),
+    importModeReplace: document.getElementById('importModeReplace'),
+    importTemplate: document.getElementById('importTemplate'),
+    btnImportConfirm: document.getElementById('btnImportConfirm'),
+    btnAiRefine: document.getElementById('btnAiRefine'),
     confirmDialog: document.getElementById('confirmDialog'),
     confirmText: document.getElementById('confirmText'),
     btnConfirmOk: document.getElementById('btnConfirmOk'),
@@ -221,6 +237,251 @@
     renderResumeList();
     closeDialog();
     toast('已恢复到 ' + when);
+  }
+
+  /* ---------------------------- 导入 PDF ---------------------------- */
+
+  let importState = null;
+
+  function openImportDialog() {
+    importState = null;
+    closeDialog();
+    el.importPick.hidden = false;
+    el.importLoading.hidden = true;
+    el.importReview.hidden = true;
+    el.btnImportConfirm.disabled = true;
+    el.importTemplate.innerHTML = TEMPLATES.map(
+      (t) => '<option value="' + t.id + '">' + t.name + '</option>'
+    ).join('');
+    el.importTemplate.value = activeResume().template;
+    el.importModeNew.checked = true;
+    el.btnAiRefine.hidden = !hasApiConfig();
+    el.pdfFileInput.value = '';
+    el.importDialog.showModal();
+  }
+
+  async function handlePdfFile(file) {
+    if (!file) return;
+    el.importPick.hidden = true;
+    el.importReview.hidden = true;
+    el.importLoading.hidden = false;
+    el.importLoadingText.textContent = '正在读取 PDF…';
+    el.btnImportConfirm.disabled = true;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      el.importLoadingText.textContent = '正在识别结构…';
+      const result = await RS.pdfImport.parse(buffer);
+      importState = Object.assign({ fileName: file.name }, result);
+      renderImportReview();
+    } catch (err) {
+      console.error('[导入]', err);
+      el.importLoading.hidden = true;
+      el.importPick.hidden = false;
+      toast('解析失败：' + (err && err.message ? err.message : '未知错误'));
+    }
+  }
+
+  function renderImportReview() {
+    const data = importState;
+    if (!data) return;
+    el.importLoading.hidden = true;
+    el.importPick.hidden = true;
+    el.importReview.hidden = false;
+    el.btnImportConfirm.disabled = false;
+
+    el.importRaw.textContent = data.lines.join('\n');
+
+    const r = data.resume;
+    const row = (label, value) =>
+      value
+        ? '<div class="import-row"><b>' +
+          escHtml(label) +
+          '</b><span>' +
+          escHtml(value) +
+          '</span></div>'
+        : '';
+    const rows = [
+      row('姓名', r.basics.name),
+      row('邮箱', r.basics.email),
+      row('电话', r.basics.phone),
+      row('城市', r.basics.city),
+      row('链接', r.basics.link),
+      row(
+        '简介',
+        r.basics.summary ? r.basics.summary.slice(0, 36) + (r.basics.summary.length > 36 ? '…' : '') : ''
+      ),
+      row('工作经历', r.experience.length ? r.experience.length + ' 条' : ''),
+      row('项目经历', r.projects.length ? r.projects.length + ' 条' : ''),
+      row('教育经历', r.education.length ? r.education.length + ' 条' : ''),
+      row('技能', r.skills.length ? r.skills.length + ' 项' : ''),
+      row('证书 / 其他', r.extras.length ? r.extras.length + ' 条' : ''),
+    ].join('');
+
+    const customs = (r.customSections || [])
+      .map((c) => row(c.title, (c.items || []).length + ' 段'))
+      .join('');
+
+    el.importSummary.innerHTML = rows + customs || '<p class="import-empty">没有识别到内容</p>';
+
+    if (data.warnings && data.warnings.length) {
+      el.importWarnings.hidden = false;
+      el.importWarnings.innerHTML = '⚠ ' + data.warnings.map(escHtml).join('<br>⚠ ');
+    } else {
+      el.importWarnings.hidden = true;
+    }
+  }
+
+  /** 把解析结果转成应用里的简历结构（补齐 id、模板、顺序） */
+  function buildImportedResume(data, template) {
+    const resume = RS.emptyResume(data.title || '导入的简历');
+    resume.template = template || 'classic';
+    resume.basics = Object.assign(resume.basics || {}, {
+      name: data.basics.name || '',
+      headline: data.basics.headline || '',
+      phone: data.basics.phone || '',
+      email: data.basics.email || '',
+      city: data.basics.city || '',
+      link: data.basics.link || '',
+      summary: data.basics.summary || '',
+    });
+    resume.experience = (data.experience || []).map((item) => ({
+      id: RS.uid(),
+      company: item.company || '',
+      role: item.role || '',
+      start: item.start || '',
+      end: item.end || '',
+      desc: item.desc || '',
+    }));
+    resume.projects = (data.projects || []).map((item) => ({
+      id: RS.uid(),
+      name: item.name || '',
+      role: item.role || '',
+      start: item.start || '',
+      end: item.end || '',
+      desc: item.desc || '',
+    }));
+    resume.education = (data.education || []).map((item) => ({
+      id: RS.uid(),
+      school: item.school || '',
+      degree: item.degree || '',
+      start: item.start || '',
+      end: item.end || '',
+      desc: item.desc || '',
+    }));
+    resume.skills = (data.skills || []).slice();
+    resume.extras = (data.extras || []).map((item) => ({
+      id: RS.uid(),
+      label: item.label || '',
+      value: item.value || '',
+    }));
+    resume.customSections = (data.customSections || []).map((section) => {
+      const custom = RS.emptyCustomSection(section.title || '其他');
+      custom.items = (section.items || []).map((item) =>
+        Object.assign(RS.emptyCustomItem(), {
+          name: item.name || '',
+          role: item.role || '',
+          start: item.start || '',
+          end: item.end || '',
+          desc: item.desc || '',
+        })
+      );
+      return custom;
+    });
+    resume.sectionOrder = RS.normalizeSectionOrder(resume);
+    return resume;
+  }
+
+  function importConfirm() {
+    if (!importState) return;
+    const template = el.importTemplate.value;
+    const resume = buildImportedResume(importState.resume, template);
+    const replace = el.importModeReplace.checked;
+
+    if (replace) {
+      const index = state.resumes.findIndex((r) => r.id === state.activeId);
+      if (index === -1) return;
+      resume.id = state.resumes[index].id;
+      state.resumes[index] = resume;
+    } else {
+      state.resumes.unshift(resume);
+      state.activeId = resume.id;
+    }
+
+    resetHistory();
+    persist();
+    paintEditor();
+    renderPreview();
+    renderResumeList();
+    renderSnapshots();
+    el.importDialog.close();
+    importState = null;
+    toast(replace ? '已用 PDF 内容覆盖当前简历' : '已导入为新简历，检查一下再导出');
+  }
+
+  /** 用大模型把结构再理一遍（用户自己的 API Key） */
+  async function aiRefine() {
+    if (!importState) return;
+    if (!hasApiConfig()) {
+      openTranslateSettings({ intro: true });
+      toast('先配置翻译服务的 API Key');
+      return;
+    }
+
+    const label = el.btnAiRefine.textContent;
+    el.btnAiRefine.disabled = true;
+    el.btnAiRefine.textContent = 'AI 整理中…';
+
+    try {
+      const text = importState.lines.join('\n').slice(0, 8000);
+      const prompt = [
+        '把下面这份简历文本整理成 JSON，只做归类，不要改写任何文字（标点、日期写法、项目符号都保持原样）。',
+        '格式：',
+        '{"basics":{"name":"","headline":"","phone":"","email":"","city":"","link":"","summary":""},',
+        '"experience":[{"company":"","role":"","start":"","end":"","desc":""}],',
+        '"projects":[{"name":"","role":"","start":"","end":"","desc":""}],',
+        '"education":[{"school":"","degree":"","start":"","end":"","desc":""}],',
+        '"skills":[""],"extras":[{"label":"","value":""}],',
+        '"extraSections":[{"title":"","content":""}]}',
+        '规则：desc 里多条要点用换行分隔；认不出的内容放进 extraSections，不要丢；只输出 JSON。',
+        '',
+        text,
+      ].join('\n');
+
+      const content = await callChat(
+        [
+          { role: 'system', content: '你是简历结构化助手，只输出 JSON。' },
+          { role: 'user', content: prompt },
+        ],
+        { json: true }
+      );
+
+      const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      const next = {
+        title: importState.resume.title,
+        basics: Object.assign({}, importState.resume.basics, parsed.basics || {}),
+        experience: parsed.experience || [],
+        projects: parsed.projects || [],
+        education: parsed.education || [],
+        skills: parsed.skills || [],
+        extras: parsed.extras || [],
+        customSections: (parsed.extraSections || []).map((section) => ({
+          title: section.title || '其他',
+          labels: null,
+          items: [{ name: '', role: '', start: '', end: '', desc: section.content || '' }],
+        })),
+      };
+      importState.resume = next;
+      renderImportReview();
+      toast('AI 已重新整理结构，请检查后再导入');
+    } catch (err) {
+      console.error('[AI 校正]', err);
+      toast('AI 校正失败：' + (err && err.message ? err.message : '未知错误'));
+    } finally {
+      el.btnAiRefine.disabled = false;
+      el.btnAiRefine.textContent = label;
+    }
   }
 
   /* ---------------------------- 预览 ---------------------------- */
@@ -1677,6 +1938,27 @@
       el.orderDialog.addEventListener('cancel', (event) => {
         event.preventDefault();
         el.orderDialog.close();
+      });
+    }
+
+    /* ---------- 导入 PDF ---------- */
+    if (el.btnImportPdf) el.btnImportPdf.addEventListener('click', openImportDialog);
+    if (el.btnPickPdf) el.btnPickPdf.addEventListener('click', () => el.pdfFileInput.click());
+    if (el.pdfFileInput) {
+      el.pdfFileInput.addEventListener('change', () => {
+        const file = el.pdfFileInput.files && el.pdfFileInput.files[0];
+        if (file) handlePdfFile(file);
+      });
+    }
+    if (el.btnImportConfirm) el.btnImportConfirm.addEventListener('click', importConfirm);
+    if (el.btnAiRefine) el.btnAiRefine.addEventListener('click', aiRefine);
+    document.querySelectorAll('[data-close-import]').forEach((btn) => {
+      btn.addEventListener('click', () => el.importDialog.close());
+    });
+    if (el.importDialog) {
+      el.importDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        el.importDialog.close();
       });
     }
 
