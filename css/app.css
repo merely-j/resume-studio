@@ -1086,6 +1086,49 @@ body {
   line-height: 1.5;
 }
 
+/* 获取 API Key 的步骤说明（折叠，默认收起） */
+.key-guide {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.key-guide summary {
+  cursor: pointer;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.key-guide ol {
+  margin: 8px 0 6px;
+  padding-left: 20px;
+}
+
+.key-guide li {
+  margin-bottom: 5px;
+}
+
+.key-guide a {
+  color: var(--accent-text);
+}
+
+.key-guide code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.key-guide p {
+  margin: 6px 0 0;
+}
+
 /* 弹窗里每条设置之间的间距 */
 .sheet-body .field {
   margin-bottom: 12px;

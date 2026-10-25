@@ -863,6 +863,26 @@ async function main() {
     JSON.stringify(enUi)
   );
 
+  // 弹窗里要有一份"怎么拿到 API Key"的说明（以 DeepSeek 为例）
+  const keyGuide = await evaluate(
+    client,
+    `(() => {
+       const guide = document.querySelector('#translateDialog .key-guide');
+       const steps = guide ? guide.querySelectorAll('ol li').length : 0;
+       return {
+         exists: !!guide,
+         steps: steps,
+         hasLink: guide ? !!guide.querySelector('a[href*="deepseek"]') : false,
+         text: guide ? guide.textContent.replace(/\\s+/g, ' ').trim().slice(0, 30) : '',
+       };
+     })()`
+  );
+  record(
+    '翻译设置里有获取 API Key 的说明',
+    keyGuide.exists && keyGuide.steps >= 4 && keyGuide.hasLink,
+    `${keyGuide.steps} 步，开头="${keyGuide.text}"`
+  );
+
   await evaluate(
     client,
     `(() => { document.querySelector('#translateDialog [data-close-translate]').click(); return true; })()`

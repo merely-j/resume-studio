@@ -197,6 +197,30 @@
           <input class="input" id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
         </label>
         <p class="hint">Key 只保存在这台设备的浏览器里，不会上传到任何服务器。建议使用自己的 Key 并设置额度上限。</p>
+
+        <!-- 不知道怎么拿 Key 的人比想象中多，这里给一份照着做就行的说明 -->
+        <details class="key-guide">
+          <summary>不知道怎么获取 API Key？照着做（以 DeepSeek 为例）</summary>
+          <ol>
+            <li>
+              打开
+              <a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer"
+                >platform.deepseek.com</a
+              >，用手机号注册并登录（新账号一般有赠送额度）
+            </li>
+            <li>在左侧菜单找到「API keys」，点「创建 API key」（有的版本叫「创建新密钥」）</li>
+            <li>
+              复制以 <code>sk-</code> 开头的那一串——<b>它只显示这一次</b>，先粘到记事本里
+            </li>
+            <li>回到这里，把它粘进上面的「API Key」输入框，点「测试连接」确认能通</li>
+            <li>如果提示余额不足：在左侧「充值」里充一点，一份简历通常只花几分钱</li>
+          </ol>
+          <p>
+            Key 相当于账号密码，不要发给别人；万一泄漏，回到同一页面删除重建一个就好。
+            其他服务商（Kimi、通义、智谱、OpenAI）流程类似，把「服务商」换成对应平台即可。
+          </p>
+        </details>
+
         <div class="inline-row">
           <button class="btn btn-ghost btn-sm" id="btnTestApi" type="button">测试连接</button>
           <span class="hint" id="testResult"></span>
