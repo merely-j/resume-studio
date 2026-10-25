@@ -628,10 +628,14 @@ async function main() {
     client,
     `(() => {
        const paper = document.querySelector('#paper');
+       const img = paper.querySelector('.r-photo');
        return {
          height: paper.scrollHeight,
          pressed: document.getElementById('btnFit').getAttribute('aria-pressed'),
          fs: parseFloat(getComputedStyle(paper.querySelector('.r-inner')).fontSize),
+         ratio: parseFloat(getComputedStyle(paper).getPropertyValue('--fs') || '1'),
+         // 用 computedStyle 读 CSS 像素，不受屏幕缩放（transform）影响
+         photoCssW: img ? parseFloat(getComputedStyle(img).width) : null,
        };
      })()`
   );
@@ -640,6 +644,17 @@ async function main() {
     beforeFit > 1130 && afterFit.height <= 1130 && afterFit.pressed === 'true',
     `${beforeFit}px → ${afterFit.height}px，字号 ${afterFit.fs}px`
   );
+
+  // 压缩时照片要跟着缩，否则会出现"字很小、照片很大"
+  if (afterFit.photoCssW) {
+    const mm26 = (26 * 96) / 25.4;
+    const expected = mm26 * afterFit.ratio;
+    record(
+      '压缩到一页时照片同步缩小',
+      Math.abs(afterFit.photoCssW - expected) <= Math.max(2, expected * 0.05),
+      `照片 CSS 宽 ${afterFit.photoCssW.toFixed(1)}px，期望 ${expected.toFixed(1)}px（--fs=${afterFit.ratio}）`
+    );
+  }
 
   // 5.10 模块间距 + 撤销 / 恢复
   await evaluate(
