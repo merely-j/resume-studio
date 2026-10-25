@@ -1304,16 +1304,20 @@ async function main() {
 
     const importReview = await evaluate(
       client,
-      `(() => ({
-         rawLines: document.getElementById('importRaw').textContent.split(String.fromCharCode(10)).length,
-         hasName: document.getElementById('importSummary').textContent.indexOf('张哲') !== -1,
-         hasExp: document.getElementById('importSummary').textContent.indexOf('工作经历') !== -1,
-         canImport: !document.getElementById('btnImportConfirm').disabled,
-       }))()`
+      `(() => {
+         const rows = [...document.querySelectorAll('#importSummary .import-row')];
+         const nameRow = rows.find((r) => r.textContent.indexOf('姓名') === 0);
+         return {
+           name: nameRow ? nameRow.querySelector('span').textContent.trim() : '',
+           rawLines: document.getElementById('importRaw').textContent.split(String.fromCharCode(10)).length,
+           hasExp: document.getElementById('importSummary').textContent.indexOf('工作经历') !== -1,
+           canImport: !document.getElementById('btnImportConfirm').disabled,
+         };
+       })()`
     );
     record(
       '导入 PDF：解析出姓名与经历',
-      importOpen === true && parsed && importReview.hasName && importReview.hasExp && importReview.canImport,
+      importOpen === true && parsed && importReview.name.length > 0 && importReview.hasExp && importReview.canImport,
       JSON.stringify(importReview)
     );
 
@@ -1324,18 +1328,19 @@ async function main() {
       `(() => {
          const s = JSON.parse(localStorage.getItem('resume-app.v1'));
          const a = s.resumes.find((r) => r.id === s.activeId);
+         const paper = document.getElementById('paper').textContent;
          return {
            resumes: s.resumes.length,
            name: a.basics.name,
            exp: a.experience.length,
-           paper: document.getElementById('paper').textContent.indexOf('张哲') !== -1,
+           paperHasName: a.basics.name ? paper.indexOf(a.basics.name) !== -1 : false,
            closed: !document.getElementById('importDialog').open,
          };
        })()`
     );
     record(
       '导入后生成新简历并渲染到纸面',
-      imported.resumes >= 2 && imported.name.length > 0 && imported.exp > 0 && imported.paper && imported.closed,
+      imported.resumes >= 2 && imported.name.length > 0 && imported.exp > 0 && imported.paperHasName && imported.closed,
       JSON.stringify(imported)
     );
   } else {
@@ -1356,5 +1361,4 @@ async function main() {
 main().catch((err) => {
   console.error('E2E 运行失败:', err.message);
   process.exitCode = 2;
-});
 });
