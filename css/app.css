@@ -1129,6 +1129,16 @@ body {
   margin: 6px 0 0;
 }
 
+/* 模块顺序面板：复用左侧原来的列表样式 */
+.sheet--order {
+  width: min(420px, calc(100vw - 40px));
+}
+
+.sheet--order .order-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 /* 弹窗里每条设置之间的间距 */
 .sheet-body .field {
   margin-bottom: 12px;

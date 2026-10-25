@@ -90,6 +90,7 @@
             <button type="button" id="btnLangEn" data-lang="en" aria-pressed="false">English</button>
           </div>
           <button class="btn btn-sm btn-ghost" id="btnTranslateSettings" type="button">🌐 翻译设置</button>
+          <button class="btn btn-sm btn-ghost" id="btnOrder" type="button" title="调整各模块的先后顺序">↕ 模块顺序</button>
         </div>
         <div class="toolbar-selects">
           <label class="tpl-select">
@@ -165,6 +166,21 @@
       <div class="sheet-foot">
         <button class="btn btn-ghost" id="btnConfirmCancel" type="button">取消</button>
         <button class="btn btn-danger" id="btnConfirmOk" type="button">确定删除</button>
+      </div>
+    </dialog>
+
+    <!-- 模块顺序：从左侧表单搬到顶部后，用这个面板调整各模块的先后 -->
+    <dialog class="sheet sheet--order" id="orderDialog" aria-label="模块顺序">
+      <div class="sheet-head">
+        <h2>模块顺序</h2>
+        <button class="icon-btn" type="button" data-close-order aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <p class="hint">用 ↑ ↓ 调整各模块在简历里的先后，改完立即生效。</p>
+        <div class="order-list" id="orderList"></div>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-primary" type="button" data-close-order>完成</button>
       </div>
     </dialog>
 

@@ -1075,6 +1075,39 @@ async function main() {
     hint.text.slice(0, 40)
   );
 
+  // 模块顺序面板：从顶部按钮打开，能真的调整顺序
+  const orderUi = await evaluate(
+    client,
+    `(() => {
+       if (document.body.dataset.lang !== 'zh') document.getElementById('btnLangZh').click();
+       document.getElementById('btnOrder').click();
+       const dialog = document.getElementById('orderDialog');
+       const rows = [...document.querySelectorAll('#orderList .order-row')];
+       const before = rows.map((r) => r.dataset.orderId);
+       const firstDown = document.querySelector('#orderList .order-row [data-dir="1"]');
+       if (firstDown) firstDown.click();
+       const after = [...document.querySelectorAll('#orderList .order-row')].map((r) => r.dataset.orderId);
+       dialog.close();
+       return { rows: rows.length, before, after };
+     })()`
+  );
+  await sleep(500);
+  const orderStored = await evaluate(
+    client,
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       return active.sectionOrder;
+     })()`
+  );
+  record(
+    '模块顺序面板在顶部，能调整顺序',
+    orderUi.rows >= 5 &&
+      orderUi.before[0] !== orderUi.after[0] &&
+      orderStored[0] === orderUi.after[0],
+    `前=${orderUi.before.slice(0, 2)} 后=${orderUi.after.slice(0, 2)} 已存=${orderStored.slice(0, 2)}`
+  );
+
   client.ws.close();
 
   for (const r of results) {

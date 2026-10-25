@@ -329,14 +329,17 @@
     return card({ key: 'basics', title: '基本信息', hint: '姓名 · 联系方式 · 简介', body: body });
   }
 
-  /** 模块顺序：个人简介、工作经历、自定义模块等大块挪上挪下 */
-  function orderCard(resume) {
+  /**
+   * 模块顺序列表（现在是顶部「顺序」按钮弹出的面板，不再占左侧表单的位置）。
+   * 返回纯 HTML 字符串，由 app.js 塞进弹窗里。
+   */
+  function renderOrderList(resume) {
     const customTitles = {};
     (resume.customSections || []).forEach((section) => {
       customTitles[section.id] = section.title;
     });
     const order = normalizeSectionOrder(resume);
-    const rows = order
+    return order
       .map(
         (id, index) => `
       <div class="order-row" data-order-id="${id}">
@@ -353,12 +356,6 @@
       </div>`
       )
       .join('');
-    return card({
-      key: 'order',
-      title: '模块顺序',
-      hint: '决定简历里各模块的先后',
-      body: `<div class="order-list">${rows}</div>`,
-    });
   }
 
   function listCard(resume, meta) {
@@ -874,7 +871,7 @@
         .join('');
       return;
     }
-    const html = [optionalHint(lang), titleCard(resume), basicsCard(resume), orderCard(resume)]
+    const html = [optionalHint(lang), titleCard(resume), basicsCard(resume)]
       .concat(ITEM_SECTIONS.map((meta) => listCard(resume, meta)))
       .concat([skillsCard(resume)])
       .concat(customs.map((custom) => customCard(resume, custom)))
@@ -1065,5 +1062,6 @@
   }
 
   RS.renderEditor = renderEditor;
+  RS.renderOrderList = renderOrderList;
   RS.bindEditor = bindEditor;
 })();

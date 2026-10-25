@@ -73,6 +73,9 @@
     testResult: document.getElementById('testResult'),
     translateIntro: document.getElementById('translateIntro'),
     btnTranslateSave: document.getElementById('btnTranslateSave'),
+    btnOrder: document.getElementById('btnOrder'),
+    orderDialog: document.getElementById('orderDialog'),
+    orderList: document.getElementById('orderList'),
     exportDialog: document.getElementById('exportDialog'),
     exportZh: document.getElementById('exportZh'),
     exportEn: document.getElementById('exportEn'),
@@ -238,6 +241,7 @@
   function paintEditor(options) {
     const o = options || {};
     renderEditor(el.editor, activeResume(), state.lang);
+    renderOrderDialog();
     if (o.focusSelector) {
       const target = el.editor.querySelector(o.focusSelector);
       if (target) {
@@ -300,6 +304,19 @@
     if (el.exportEnCount) {
       el.exportEnCount.textContent = missing ? missing + ' 处待翻译' : '已完成';
     }
+  }
+
+  /* ---------------------------- 模块顺序面板 ---------------------------- */
+
+  /** 顺序列表始终同步：弹窗没打开时也渲染，改完名字/增删模块能立刻反映 */
+  function renderOrderDialog() {
+    if (!el.orderList) return;
+    el.orderList.innerHTML = RS.renderOrderList(activeResume());
+  }
+
+  function openOrderDialog() {
+    renderOrderDialog();
+    el.orderDialog.showModal();
   }
 
   /* ---------------------------- 数据操作 ---------------------------- */
@@ -938,11 +955,13 @@
     persist();
     schedulePreview();
 
-    // 同步编辑器里的卡片头和"模块顺序"列表，避免整块重绘导致输入框失焦
+    // 同步编辑器里的卡片头和"模块顺序"面板，避免整块重绘导致输入框失焦
     const label = sectionTitle(resume, sectionId);
     const head = el.editor.querySelector('[data-card="' + sectionId + '"] .card-title');
     if (head) head.textContent = label;
-    const rowName = el.editor.querySelector('[data-order-id="' + sectionId + '"] .order-name');
+    const rowName = el.orderList
+      ? el.orderList.querySelector('[data-order-id="' + sectionId + '"] .order-name')
+      : null;
     if (rowName) rowName.textContent = label;
   }
 
@@ -1475,6 +1494,26 @@
         el.settingsDialog.close();
       });
     });
+
+    /* ---------- 模块顺序 ---------- */
+    if (el.btnOrder) el.btnOrder.addEventListener('click', openOrderDialog);
+    if (el.orderList) {
+      el.orderList.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-action="move-section"]');
+        if (!btn) return;
+        withHistory(moveSection)(btn.dataset.sectionId, Number(btn.dataset.dir));
+        renderOrderDialog();
+      });
+    }
+    document.querySelectorAll('[data-close-order]').forEach((btn) => {
+      btn.addEventListener('click', () => el.orderDialog.close());
+    });
+    if (el.orderDialog) {
+      el.orderDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        el.orderDialog.close();
+      });
+    }
 
     /* ---------- 导出 ---------- */
     el.btnExportConfirm.addEventListener('click', confirmExport);
