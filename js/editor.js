@@ -14,15 +14,6 @@
   const RS = (window.RS = window.RS || {});
   const { normalizeSectionOrder, SECTION_LABELS, CUSTOM_LABELS, sectionTitle } = RS;
 
-  /** 模块名输入框（每个大模块都能改名，基本信息除外） */
-  function sectionTitleField(resume, id, label) {
-    return `
-    <div class="field" data-span="2">
-      <span class="field-label">${esc(label || '模块名称（显示在简历里）')}</span>
-      <input class="input" data-section-title="${id}" value="${esc(sectionTitle(resume, id))}" />
-    </div>`;
-  }
-
   /** 自定义模块里五个字段的"用途"说明，用于给改名字的输入框做标签 */
   const CUSTOM_FIELD_NAMES = {
     name: '名称字段',
@@ -108,10 +99,17 @@
   /** 折叠卡片外壳：用原生 <details>，零 JS 就能折叠，键盘和读屏也友好 */
   function card(opts) {
     const o = opts;
+    const edit = o.edit
+      ? `<button class="icon-btn card-edit" type="button" data-action="edit-title"
+           data-section-id="${esc(o.edit.id)}" data-edit-lang="${o.edit.lang || 'zh'}"${
+          o.edit.custom ? ' data-edit-custom="1"' : ''
+        } title="修改模块名称" aria-label="修改模块名称">✏️</button>`
+      : '';
     return `
     <details class="card" data-card="${o.key}" open>
       <summary class="card-head">
         <span class="card-title">${esc(o.title)}</span>
+        ${edit}
         ${o.count === undefined ? '' : `<span class="card-count">${o.count}</span>`}
         ${o.hint ? `<span class="card-hint">${esc(o.hint)}</span>` : ''}
         <span class="card-chevron" aria-hidden="true"></span>
@@ -333,34 +331,26 @@
         key: 'summary',
         title: '个人简介',
         hint: 'Summary',
-        body: `<div class="grid">
-          ${field({
-            label: '模块标题（英文）',
-            bind: 'en.sectionTitles.summary',
-            value: (e.sectionTitles || {}).summary || '',
-            placeholder: RS.EN_SECTION_TITLES.summary,
-            span: 2,
-          })}
-        </div>
-        ${richField({
+        edit: { id: 'summary', lang: 'en' },
+        body: richField({
           label: 'Summary',
           bind: 'en.basics.summary',
           value: eb.summary,
           placeholder: 'One short paragraph: who you are, what you are good at, what you shipped.',
           hint: srcHint(zh.summary),
-        })}`,
+        }),
       });
     }
     return card({
       key: 'summary',
       title: '个人简介',
-      body: `${sectionTitleField(resume, 'summary', '简介模块名称（显示在简历里）')}
-      ${richField({
+      edit: { id: 'summary' },
+      body: richField({
         label: '个人简介',
         bind: 'basics.summary',
         value: zh.summary,
         placeholder: '三句话：你是谁、擅长什么、做出过什么结果（可加粗/斜体）',
-      })}`,
+      }),
     });
   }
 
@@ -442,7 +432,6 @@
       .join('');
 
     const body = `
-    ${sectionTitleField(resume, meta.key)}
     <div class="items">${list || '<p class="empty-hint">还没有内容，点下面的按钮添加。</p>'}</div>
     <button class="btn btn-ghost btn-block" data-action="add-item" data-section="${meta.key}">
       ＋ ${esc(meta.addLabel)}
@@ -450,6 +439,7 @@
     return card({
       key: meta.key,
       title: meta.title,
+      edit: { id: meta.key },
       count: items.length || undefined,
       body: body,
     });
@@ -520,7 +510,6 @@
       )
       .join('');
     const body = `
-    ${sectionTitleField(resume, 'skills')}
     <p class="form-sub">技能</p>
     <div class="chip-add">
       <input class="input" data-chip-input placeholder="输入技能后按回车，如 Figma" />
@@ -534,6 +523,7 @@
     return card({
       key: 'skills',
       title: '技能与证书',
+      edit: { id: 'skills' },
       count: skills.length + extras.length || undefined,
       body: body,
     });
@@ -613,16 +603,6 @@
       .join('');
 
     const body = `
-    <div class="grid">
-      ${field({
-        label: '模块名称（显示在简历里）',
-        value: custom.title,
-        span: 2,
-        metaOnly: true,
-        customId: custom.id,
-        metaKey: 'title',
-      })}
-    </div>
     <p class="form-sub">字段名称（都可以改）</p>
     <div class="grid">${labelFields}</div>
 
@@ -634,6 +614,7 @@
     return card({
       key: 'custom_' + custom.id,
       title: custom.title || '自定义模块',
+      edit: { id: custom.id, custom: true },
       count: items.length || undefined,
       body: body,
     });
@@ -725,17 +706,8 @@
   /** 英文版：列表型模块（经历 / 项目 / 教育） */
   function enListCard(resume, meta) {
     const en = RS.syncEnglish(resume) || {};
-    const titles = en.sectionTitles || {};
     const zhItems = resume[meta.key] || [];
     const enItems = en[meta.key] || [];
-
-    const titleField = field({
-      label: '模块标题（英文）',
-      bind: 'en.sectionTitles.' + meta.key,
-      value: titles[meta.key] || '',
-      placeholder: RS.EN_SECTION_TITLES[meta.key] || meta.title,
-      span: 2,
-    });
 
     const items = zhItems
       .map((zhItem) => {
@@ -777,10 +749,9 @@
       key: meta.key,
       title: meta.title,
       hint: 'English',
+      edit: { id: meta.key, lang: 'en' },
       count: zhItems.length || undefined,
-      body: `<div class="grid">${titleField}</div>${
-        items || '<p class="empty-hint">中文版这一块还没有内容，先到中文版添加。</p>'
-      }`,
+      body: items || '<p class="empty-hint">中文版这一块还没有内容，先到中文版添加。</p>',
     });
   }
 
@@ -802,15 +773,6 @@
       )
       .join('');
     const body = `
-    <div class="grid">
-      ${field({
-        label: '模块标题（英文）',
-        bind: 'en.sectionTitles.skills',
-        value: titles.skills || '',
-        placeholder: RS.EN_SECTION_TITLES.skills,
-        span: 2,
-      })}
-    </div>
     <p class="form-sub">技能 ${srcHint(zhSkills)}</p>
     <div class="chip-add">
       <input class="input" data-chip-input data-scope="en" placeholder="输入技能后按回车，如 Figma" />
@@ -824,6 +786,7 @@
     return card({
       key: 'skills',
       title: '技能与证书',
+      edit: { id: 'skills', lang: 'en' },
       count: skills.length + extras.length || undefined,
       body: body,
     });
@@ -935,6 +898,55 @@
     } else {
       handlers.setField(field.dataset.section, field.dataset.id, field.dataset.field, html, field.dataset.scope);
     }
+  }
+
+  /** 卡片标题就地改名：点 ✏️ → 标题变成输入框 → 回车/失焦保存，Esc 取消 */
+  function startTitleEdit(btn, handlers) {
+    const cardEl = btn.closest('.card');
+    if (!cardEl) return;
+    const titleEl = cardEl.querySelector('.card-head .card-title');
+    if (!titleEl) return;
+
+    const id = btn.dataset.sectionId;
+    const isEn = btn.dataset.editLang === 'en';
+    const isCustom = btn.dataset.editCustom === '1';
+    const current = titleEl.textContent;
+
+    const input = document.createElement('input');
+    input.className = 'card-title-input';
+    input.value = current;
+    input.setAttribute('aria-label', '模块名称');
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const value = input.value.trim();
+      const span = document.createElement('span');
+      span.className = 'card-title';
+      span.textContent = save && value ? value : current;
+      input.replaceWith(span);
+      if (!save || !value || value === current) return;
+      if (isCustom) handlers.setCustomMeta(id, 'title', value);
+      else if (isEn) handlers.setPath('en.sectionTitles.' + id, value);
+      else handlers.setSectionTitle(id, value);
+    };
+
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (event) => {
+      // 别让空格/方向键冒泡到卡片的折叠逻辑
+      event.stopPropagation();
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        input.blur();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(false);
+      }
+    });
   }
 
   /**
@@ -1069,6 +1081,14 @@
       const dir = btn.dataset.dir;
       const index = btn.dataset.index;
       const scope = btn.dataset.scope;
+
+      if (action === 'edit-title') {
+        // 铅笔在 <summary> 里，不拦住的话点一下会顺带折叠卡片
+        event.preventDefault();
+        event.stopPropagation();
+        startTitleEdit(btn, handlers);
+        return;
+      }
 
       if (action === 'add-item') {
         handlers.addItem(section, scope);

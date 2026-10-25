@@ -6,6 +6,38 @@
    3. 输入框统一 16px 字号 —— iOS Safari 对 <16px 的输入框会自动放大页面
    ========================================================================== */
 
+/* 卡片标题旁的改名按钮 + 就地编辑输入框 */
+.card-edit {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.5;
+  background: transparent;
+  border: 0;
+}
+
+.card-edit:hover,
+.card-edit:focus-visible {
+  opacity: 1;
+  background: var(--panel-2);
+}
+
+.card-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+}
+
 /* 作者样式里的 display:flex 会盖掉浏览器默认的 [hidden]，这里强制一下 */
 [hidden] {
   display: none !important;

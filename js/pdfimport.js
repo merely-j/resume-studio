@@ -49,33 +49,39 @@
    * 标题匹配也会失败。NFKC 能修好康熙部首区（U+2F00–2FDF），
    * 但部首补充区（U+2E80–2EFF）不在标准分解里，得自己补一张表。
    */
-  const RADICAL_FIX = {
-    '\u2E80': '一', '\u2E81': '丨', '\u2E82': '丶', '\u2E83': '丿', '\u2E84': '乙',
-    '\u2E85': '亅', '\u2E86': '二', '\u2E87': '亠', '\u2E88': '人', '\u2E89': '儿',
-    '\u2E8A': '入', '\u2E8B': '八', '\u2E8C': '冂', '\u2E8D': '冖', '\u2E8E': '冫',
-    '\u2E8F': '几', '\u2E90': '凵', '\u2E91': '刀', '\u2E92': '刂', '\u2E93': '力',
-    '\u2E94': '勹', '\u2E95': '匕', '\u2E96': '匚', '\u2E97': '匸', '\u2E98': '十',
-    '\u2E99': '卜', '\u2E9B': '卩', '\u2E9C': '厂', '\u2E9D': '厶', '\u2E9E': '又',
-    '\u2E9F': '母', '\u2EA0': '民', '\u2EA1': '氵', '\u2EA2': '水', '\u2EA3': '火',
-    '\u2EA4': '灬', '\u2EA5': '爪', '\u2EA6': '父', '\u2EA7': '爻', '\u2EA8': '爿',
-    '\u2EA9': '片', '\u2EAA': '牙', '\u2EAB': '牛', '\u2EAC': '犬', '\u2EAD': '玄',
-    '\u2EAE': '玉', '\u2EAF': '瓜', '\u2EB0': '瓦', '\u2EB1': '甘', '\u2EB2': '生',
-    '\u2EB3': '用', '\u2EB4': '田', '\u2EB5': '疋', '\u2EB6': '疒', '\u2EB7': '癶',
-    '\u2EB8': '白', '\u2EB9': '皮', '\u2EBA': '皿', '\u2EBB': '目', '\u2EBC': '矛',
-    '\u2EBD': '矢', '\u2EBE': '石', '\u2EBF': '示', '\u2EC0': '禸', '\u2EC1': '禾',
-    '\u2EC2': '穴', '\u2EC3': '立', '\u2EC4': '竹', '\u2EC5': '米', '\u2EC6': '糸',
-    '\u2EC7': '缶', '\u2EC8': '网', '\u2EC9': '羊', '\u2ECA': '羽', '\u2ECB': '老',
-    '\u2ECC': '而', '\u2ECD': '耒', '\u2ECE': '耳', '\u2ECF': '聿', '\u2ED0': '肉',
-    '\u2ED1': '臣', '\u2ED2': '自', '\u2ED3': '长', '\u2ED4': '至', '\u2ED5': '臼',
-    '\u2ED6': '舌', '\u2ED7': '舛', '\u2ED8': '舟', '\u2ED9': '艮', '\u2EDA': '色',
-    '\u2EDB': '艸', '\u2EDC': '虍', '\u2EDD': '虫', '\u2EDE': '血', '\u2EDF': '行',
-    '\u2EE0': '衣', '\u2EE1': '襾', '\u2EE2': '见', '\u2EE3': '角', '\u2EE4': '言',
-    '\u2EE5': '谷', '\u2EE6': '豆', '\u2EE7': '豕', '\u2EE8': '豸', '\u2EE9': '贝',
-    '\u2EEA': '赤', '\u2EEB': '走', '\u2EEC': '足', '\u2EED': '身', '\u2EEE': '车',
-    '\u2EEF': '辛', '\u2EF0': '辰', '\u2EF1': '辵', '\u2EF2': '邑', '\u2EF3': '酉',
-    '\u2EF4': '釆', '\u2EF5': '里', '\u2EF6': '金', '\u2EF7': '长', '\u2EF8': '门',
-    '\u2EF9': '阜', '\u2EFA': '隶', '\u2EFB': '隹', '\u2EFC': '雨', '\u2EFD': '靑',
-    '\u2EFE': '非', '\u2EFF': '面',
+  const SIMPLIFIED_RADICAL = {
+    '\u2E9F': '母', // 部首「母」的写法，PDF 里常出现在"⺟语"
+    '\u2EA6': '丬', // 爿
+    '\u2EB0': '纟', // 糸
+    '\u2EC5': '见',
+    '\u2EC6': '角',
+    '\u2EC8': '讠', // 言
+    '\u2EC9': '贝',
+    '\u2ECB': '车',
+    '\u2ECC': '辶',
+    '\u2ED0': '钅', // 金
+    '\u2ED3': '长',
+    '\u2ED4': '门',
+    '\u2ED9': '韦',
+    '\u2EDA': '页',
+    '\u2EDB': '风',
+    '\u2EDC': '飞',
+    '\u2EE0': '饣', // 食
+    '\u2EE2': '马',
+    '\u2EE5': '鱼',
+    '\u2EE6': '鸟',
+    '\u2EE7': '卤',
+    '\u2EE8': '麦',
+    '\u2EE9': '黄',
+    '\u2EEA': '黾',
+    '\u2EEB': '斉',
+    '\u2EEC': '齐',
+    '\u2EED': '歯',
+    '\u2EEE': '齿',
+    '\u2EEF': '竜',
+    '\u2EF0': '龙',
+    '\u2EF2': '亀',
+    '\u2EF3': '龟',
   };
 
   /** NFKC 之后仍有少数会还原成繁体（如「戶」），按简体修一下 */
@@ -103,15 +109,17 @@
     for (const ch of src) {
       const code = ch.codePointAt(0);
       if (code >= 0x2e80 && code <= 0x2eff) {
-        // 部首补充区：NFKC 覆盖不到，用自己的表
-        out += RADICAL_FIX[ch] || ch;
+        // 部首补充区：NFKC 覆盖不到，只替换"已确认的简体部首"，
+        // 认不出的一律原样保留（后面会给出提示，而不是乱猜一个字）
+        out += SIMPLIFIED_RADICAL[ch] || ch;
       } else if (code >= 0x2f00 && code <= 0x2fdf) {
         // 康熙部首区：NFKC 能修，但它会顺手把全角标点改成半角，
-        // 所以这里只对"部首字符"逐个做 NFKC，其余字符原样保留
+        // 所以只对"部首字符"逐个做 NFKC
         const fixed = ch.normalize('NFKC');
         out += TRADITIONAL_FIX[fixed] || fixed;
       } else {
-        out += TRADITIONAL_FIX[ch] || ch;
+        // 正文里的字一律不动（繁体用户写的繁体也保留）
+        out += ch;
       }
     }
     return out;
@@ -292,9 +300,14 @@
 
   function isHeading(line, bodySize, headingSize) {
     const text = line.text.replace(/[：:]\s*$/, '');
-    if (line.size >= headingSize - 0.1 && text.length <= 24) return true;
-    if (line.size > bodySize + 0.6 && text.length <= 24) return true;
-    return SECTION_PATTERNS.some((p) => p.re.test(text));
+    // 命中模块名关键词，直接当标题
+    if (SECTION_PATTERNS.some((p) => p.re.test(text))) return true;
+    // 带日期范围的是"经历/项目条目"，不是模块标题
+    if (DATE_RANGE.test(text)) return false;
+    // 模块标题一般很短；长一点的多半是条目
+    if (text.length > 12) return false;
+    if (line.size >= headingSize - 0.1) return true;
+    return line.size > bodySize + 0.6;
   }
 
   function sectionIdFor(title) {

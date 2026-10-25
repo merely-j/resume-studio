@@ -18,7 +18,11 @@ const DEBUG_PORT = process.env.CDP_PORT || 9333;
 const APP_URL = process.env.APP_URL || 'https://merely-j.github.io/resume-studio/';
 
 const results = [];
-const record = (name, ok, detail = '') => results.push({ name, ok, detail });
+const record = (name, ok, detail = '') => {
+  results.push({ name, ok, detail });
+  // 边跑边打，崩在中间时也能看出走到哪一步了
+  if (process.env.E2E_VERBOSE) console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}`);
+};
 
 async function getPageTarget() {
   const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`);
@@ -445,7 +449,7 @@ async function main() {
     `颜色=${layout.ruleColor}`
   );
 
-  // 5.6 自定义模块：添加 → 改名 → 加一条 → 进简历
+  // 5.6 自定义模块：添加 → 用铅笔改名 → 加一条 → 进简历
   await evaluate(
     client,
     `(() => { document.querySelector('[data-action="add-custom"]').click(); return true; })()`
@@ -454,11 +458,20 @@ async function main() {
   const customId = await evaluate(
     client,
     `(() => {
-       const input = document.querySelector('[data-custom-meta][data-meta-key="title"]');
-       if (!input) return null;
-       input.value = '获奖经历';
-       input.dispatchEvent(new Event('input', { bubbles: true }));
-       return input.dataset.customMeta;
+       const cards = [...document.querySelectorAll('#editorPane [data-card^="custom_"]')];
+       const card = cards[cards.length - 1];
+       if (!card) return null;
+       const id = card.dataset.card.replace('custom_', '');
+       const pencil = card.querySelector('[data-action="edit-title"]');
+       if (pencil) {
+         pencil.click();
+         const input = card.querySelector('.card-title-input');
+         if (input) {
+           input.value = '获奖经历';
+           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+         }
+       }
+       return id;
      })()`
   );
   record('可以添加自定义模块并改名', !!customId, `id=${customId}`);
@@ -558,16 +571,22 @@ async function main() {
   );
   record('富文本框能真正输入文字', typed);
 
-  // 5.8 模块标题可以改名
-  await evaluate(
+  // 5.8 模块标题可以改名（点卡片标题旁的 ✏️，就地编辑）
+  const pencil = await evaluate(
     client,
     `(() => {
-       const input = document.querySelector('[data-section-title="experience"]');
+       const btn = document.querySelector('[data-card="experience"] [data-action="edit-title"]');
+       if (!btn) return { ok: false, reason: '没有铅笔按钮' };
+       btn.click();
+       const input = document.querySelector('[data-card="experience"] .card-title-input');
+       if (!input) return { ok: false, reason: '没有进入编辑态' };
+       const focused = document.activeElement === input;
        input.value = '职业经历';
-       input.dispatchEvent(new Event('input', { bubbles: true }));
-       return true;
+       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+       return { ok: true, focused, value: input.value };
      })()`
   );
+  record('点铅笔能就地改模块标题', pencil.ok === true && pencil.focused === true, JSON.stringify(pencil));
   await waitFrames(client);
   const renamed = await evaluate(
     client,
@@ -666,31 +685,43 @@ async function main() {
   await sleep(400);
   const edited = await evaluate(
     client,
-    `document.querySelector('#paper').textContent.indexOf('撤销测试专用内容') !== -1`
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       return (active.basics.summary || '').indexOf('撤销测试专用内容') !== -1;
+     })()`
   );
   await evaluate(client, `(() => { document.getElementById('btnUndo').click(); return true; })()`);
   await sleep(400);
   const undone = await evaluate(
     client,
-    `(() => ({
-       gone: document.querySelector('#paper').textContent.indexOf('撤销测试专用内容') === -1,
-       redoEnabled: !document.getElementById('btnRedo').disabled,
-       editorText: document.querySelector('[data-rich][data-bind="basics.summary"]').textContent.slice(0, 6),
-     }))()`
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       return {
+         gone: (active.basics.summary || '').indexOf('撤销测试专用内容') === -1,
+         redoEnabled: !document.getElementById('btnRedo').disabled,
+         editorText: document.querySelector('[data-rich][data-bind="basics.summary"]').textContent.slice(0, 6),
+       };
+     })()`
   );
   record(
     '可以撤销刚才的修改',
     edited && undone.gone && undone.redoEnabled,
-    `编辑器开头="${undone.editorText}"`
+    `edited=${edited} gone=${undone.gone} redo=${undone.redoEnabled} 编辑器="${undone.editorText}"`
   );
 
   await evaluate(client, `(() => { document.getElementById('btnRedo').click(); return true; })()`);
   await sleep(400);
   const redone = await evaluate(
     client,
-    `document.querySelector('#paper').textContent.indexOf('撤销测试专用内容') !== -1`
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       return (active.basics.summary || '').indexOf('撤销测试专用内容') !== -1;
+     })()`
   );
-  record('可以恢复被撤销的内容', redone);
+  record('可以恢复被撤销的内容', redone, `恢复到=${redone}`);
 
   // 6. 切换模板
   const tpl = await evaluate(
@@ -1318,10 +1349,12 @@ async function main() {
   }
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} 通过`);
-  process.exit(failed.length ? 1 : 0);
+  // 用 exitCode 而不是 process.exit：管道输出时 exit 会把还没刷出去的日志截断
+  process.exitCode = failed.length ? 1 : 0;
 }
 
 main().catch((err) => {
   console.error('E2E 运行失败:', err.message);
-  process.exit(2);
+  process.exitCode = 2;
+});
 });
