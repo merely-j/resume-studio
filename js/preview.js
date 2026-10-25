@@ -232,24 +232,24 @@
 
   /** 技能与证书：同一个模块里，上一段技能、下一段证书 */
   function skillsCertsHtml(resume) {
-    const skills = (resume.skills || []).filter(has);
+    const skills = (resume.skills || []).filter(
+      (item) => has(item && item.label) || has(item && item.value)
+    );
     const certs = (resume.extras || []).filter((item) => has(item.label) || has(item.value));
     if (!skills.length && !certs.length) return '';
 
-    const skillsPart = skills.length
-      ? `<p class="r-skills">${skills.map(esc).join('<span class="r-dot">·</span>')}</p>`
-      : '';
-    const certsPart = certs.length
-      ? `<ul class="r-extras">${certs
-          .map(
-            (item) =>
-              `<li>${
-                has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
-              }${esc(item.value)}</li>`
-          )
-          .join('')}</ul>`
-      : '';
-    return section(sectionTitle(resume, 'skills'), skillsPart + certsPart);
+    // 技能和证书用同一套"类别 + 内容"排版
+    const rowsOf = (items) =>
+      `<ul class="r-extras">${items
+        .map(
+          (item) =>
+            `<li>${
+              has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
+            }${esc(item.value)}</li>`
+        )
+        .join('')}</ul>`;
+
+    return section(sectionTitle(resume, 'skills'), rowsOf(skills) + rowsOf(certs));
   }
 
   /** 自定义模块：字段名由用户自己定，结构和工作经历一致 */
@@ -361,7 +361,9 @@
       : '';
 
     const skillsBlock = (function () {
-      const skills = (resume.skills || []).filter(has);
+      const skills = (resume.skills || []).filter(
+        (item) => has(item && item.label) || has(item && item.value)
+      );
       const certs = (resume.extras || []).filter((item) => has(item.label) || has(item.value));
       if (!skills.length && !certs.length) return '';
       return `<div class="r-side-block" data-target="skills" data-label="${esc(
@@ -370,7 +372,12 @@
         ${
           skills.length
             ? `<ul class="r-side-list r-side-list--plain">${skills
-                .map((s) => `<li>${esc(s)}</li>`)
+                .map(
+                  (item) =>
+                    `<li>${
+                      has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
+                    }${esc(item.value)}</li>`
+                )
                 .join('')}</ul>`
             : ''
         }

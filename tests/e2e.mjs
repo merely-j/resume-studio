@@ -172,25 +172,46 @@ async function main() {
   );
   record('新增后自动聚焦到新条目', focusedNew);
 
-  // 3. 添加技能（回车）
+  // 3. 添加技能：和证书一样是「类别 + 内容」两栏，自己填
   await evaluate(
     client,
     `(() => {
-      const input = document.querySelector('[data-chip-input]');
-      input.value = 'TypeScript';
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-      return true;
-    })()`
+       const btn = document.querySelector('[data-action="add-item"][data-section="skills"]');
+       if (btn) btn.click();
+       return true;
+     })()`
+  );
+  await sleep(300);
+  const skillTyped = await evaluate(
+    client,
+    `(() => {
+       const card = document.querySelector('[data-card="skills"]');
+       const items = card ? card.querySelectorAll('.item') : [];
+       const last = items[items.length - 1];
+       if (!last) return { ok: false };
+       const label = last.querySelector('[data-field="label"]');
+       const value = last.querySelector('[data-field="value"]');
+       label.value = '编程语言';
+       label.dispatchEvent(new Event('input', { bubbles: true }));
+       value.value = 'TypeScript';
+       value.dispatchEvent(new Event('input', { bubbles: true }));
+       return { ok: true, count: items.length };
+     })()`
   );
   await waitFrames(client);
   const chip = await evaluate(
     client,
     `({
-      count: document.querySelectorAll('.chip').length,
-      preview: document.querySelector('#paper').textContent.includes('TypeScript'),
-    })`
+       count: document.querySelectorAll('[data-card="skills"] .item').length,
+       preview: document.querySelector('#paper').textContent.includes('TypeScript'),
+       hasLabel: document.querySelector('#paper').textContent.includes('编程语言'),
+     })`
   );
-  record('回车能添加技能标签', chip.count > 0 && chip.preview, `chips=${chip.count}`);
+  record(
+    '技能可以自己填「类别 + 内容」',
+    skillTyped.ok && chip.count > 0 && chip.preview && chip.hasLabel,
+    `条目=${chip.count} 内容=${chip.preview} 类别=${chip.hasLabel}`
+  );
 
   // 4. 上传照片（用调试协议把文件塞进隐藏的 file input，等价于用户点选文件）
   const avatar = new URL('./fixtures/avatar.jpg', import.meta.url).pathname.replace(/^\//, '');
@@ -857,17 +878,17 @@ async function main() {
   const persisted = await evaluate(
     client,
     `(() => {
-      const input = document.querySelector('[data-bind="basics.name"]');
-      return {
-        name: input && input.value,
-        template: document.querySelector('#paper .tpl-modern') ? 'modern' : 'other',
-        chips: document.querySelectorAll('.chip').length,
-      };
-    })()`
+       const input = document.querySelector('[data-bind="basics.name"]');
+       return {
+         name: input && input.value,
+         template: document.querySelector('#paper .tpl-modern') ? 'modern' : 'other',
+         skills: document.querySelectorAll('[data-card="skills"] .item').length,
+       };
+     })()`
   );
   record('刷新后姓名仍在', persisted.name === '李雷', `实际=${persisted.name}`);
   record('刷新后模板选择保留', persisted.template === 'modern');
-  record('刷新后技能标签仍在', persisted.chips > 0, `chips=${persisted.chips}`);
+  record('刷新后技能条目仍在', persisted.skills > 0, `条目=${persisted.skills}`);
 
   // 7.1 导出 PDF 的文件名 = 简历名称（直接下载，不再改 document.title）
   const expectedName = await evaluate(

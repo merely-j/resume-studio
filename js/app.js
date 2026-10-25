@@ -369,7 +369,11 @@
       end: item.end || '',
       desc: item.desc || '',
     }));
-    resume.skills = (data.skills || []).slice();
+    resume.skills = (data.skills || []).map((item) =>
+      typeof item === 'string'
+        ? { id: RS.uid(), label: '', value: item }
+        : { id: RS.uid(), label: item.label || '', value: item.value || '' }
+    );
     resume.extras = (data.extras || []).map((item) => ({
       id: RS.uid(),
       label: item.label || '',
@@ -909,8 +913,15 @@
       if (plainText(item.desc)) fields.push({ key: 'education:' + item.id + ':desc', text: plainText(item.desc) });
     });
 
-    const skills = (resume.skills || []).filter(Boolean);
-    if (skills.length) fields.push({ key: 'skills', text: skills.join(' / ') });
+    (resume.skills || []).forEach((item) => {
+      if (plainText(item.label)) fields.push({ key: 'skills:' + item.id + ':label', text: plainText(item.label) });
+      if (plainText(item.value)) fields.push({ key: 'skills:' + item.id + ':value', text: plainText(item.value) });
+    });
+
+    (resume.extras || []).forEach((item) => {
+      if (plainText(item.label)) fields.push({ key: 'extras:' + item.id + ':label', text: plainText(item.label) });
+      if (plainText(item.value)) fields.push({ key: 'extras:' + item.id + ':value', text: plainText(item.value) });
+    });
 
     (resume.customSections || []).forEach((custom) => {
       (custom.items || []).forEach((item) => {
@@ -930,10 +941,12 @@
     if (!value) return;
 
     if (key === 'skills') {
+      // 老数据里的整体技能字段（纯字符串拼接），按"只有内容"的一条写回
       en.skills = String(value)
         .split(/\s*\/\s*/)
         .map((s) => s.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .map((text) => ({ id: RS.uid(), label: '', value: text }));
       return;
     }
     if (key.indexOf('basics.') === 0) {

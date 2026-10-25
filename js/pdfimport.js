@@ -496,8 +496,10 @@
         resume.extras.push({ label: '语言', value: (bucket.raw || bucket.items.join(' · ')).trim() });
         return;
       }
+      const label = bucket.label || '';
       bucket.items.forEach((item) => {
-        if (resume.skills.indexOf(item) === -1) resume.skills.push(item);
+        const exists = resume.skills.some((s) => s.label === label && s.value === item);
+        if (!exists) resume.skills.push({ label: label, value: item });
       });
     });
   }

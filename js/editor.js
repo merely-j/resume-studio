@@ -445,47 +445,47 @@
     });
   }
 
-  /** 证书条目（原来的独立模块，现在并入"技能与证书"） */
-  function extrasItems(resume, scope) {
-    const en = scope === 'en';
-    const source = en ? (RS.syncEnglish(resume) || {}).extras : resume.extras;
-    const items = source || [];
+  /** "类别 + 内容"两列条目：技能和证书共用同一套渲染 */
+  function valueRows(opts) {
+    const o = opts;
+    const en = o.scope === 'en';
+    const items = o.items || [];
     const scopeAttr = en ? ' data-scope="en"' : '';
     if (!items.length) {
-      return `<p class="empty-hint">还没有${en ? '证书 / 语言' : '证书'}，点下面的按钮添加。</p>`;
+      return `<p class="empty-hint">${o.emptyText || '还没有内容，点下面的按钮添加。'}</p>`;
     }
     return items
       .map((item) => {
         const body = [
           field({
-            label: en ? 'Label' : '类别',
+            label: o.labelText || (en ? 'Label' : '类别'),
             value: item.label,
-            section: 'extras',
+            section: o.section,
             id: item.id,
             name: 'label',
-            placeholder: en ? 'Certificate / Language' : '证书 / 语言',
-            scope: scope,
+            placeholder: o.labelPlaceholder || '',
+            scope: o.scope,
           }),
           field({
-            label: en ? 'Content' : '内容',
+            label: o.valueText || (en ? 'Content' : '内容'),
             value: item.value,
-            section: 'extras',
+            section: o.section,
             id: item.id,
             name: 'value',
-            placeholder: en ? 'PMP (2023), CET-6' : 'PMP（2023）、CET-6',
-            scope: scope,
+            placeholder: o.valuePlaceholder || '',
+            scope: o.scope,
           }),
         ].join('');
         return `
         <div class="item" data-item="${item.id}">
           <div class="item-bar">
-            <span class="item-title">${esc(item.label || '新条目')}</span>
+            <span class="item-title">${esc(item.label || item.value || '新条目')}</span>
             <span class="item-tools">
-              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="-1"${scopeAttr}
+              <button class="icon-btn" data-action="move-item" data-section="${o.section}" data-id="${item.id}" data-dir="-1"${scopeAttr}
                       title="上移" aria-label="上移">↑</button>
-              <button class="icon-btn" data-action="move-item" data-section="extras" data-id="${item.id}" data-dir="1"${scopeAttr}
+              <button class="icon-btn" data-action="move-item" data-section="${o.section}" data-id="${item.id}" data-dir="1"${scopeAttr}
                       title="下移" aria-label="下移">↓</button>
-              <button class="icon-btn icon-btn--danger" data-action="remove-item" data-section="extras" data-id="${item.id}"${scopeAttr}
+              <button class="icon-btn icon-btn--danger" data-action="remove-item" data-section="${o.section}" data-id="${item.id}"${scopeAttr}
                       title="删除" aria-label="删除">✕</button>
             </span>
           </div>
@@ -495,27 +495,38 @@
       .join('');
   }
 
-  /** 技能与证书：一个模块里，上半部分技能、下半部分证书 */
+  /** 证书条目（原来的独立模块，现在并入"技能与证书"） */
+  function extrasItems(resume, scope) {
+    const en = scope === 'en';
+    const source = en ? (RS.syncEnglish(resume) || {}).extras : resume.extras;
+    return valueRows({
+      items: source || [],
+      section: 'extras',
+      scope: scope,
+      emptyText: `还没有${en ? '证书 / 语言' : '证书'}，点下面的按钮添加。`,
+      labelText: en ? 'Label' : '类别',
+      valueText: en ? 'Content' : '内容',
+      labelPlaceholder: en ? 'Certificate / Language' : '证书 / 语言',
+      valuePlaceholder: en ? 'PMP (2023), CET-6' : 'PMP（2023）、CET-6',
+    });
+  }
+
+  /** 技能与证书：技能和证书一样，都是"类别 + 内容"，全部自己填 */
   function skillsCard(resume) {
     const skills = resume.skills || [];
     const extras = resume.extras || [];
-    const chips = skills
-      .map(
-        (s, i) => `
-      <span class="chip">${esc(s)}
-        <button class="chip-x" data-action="remove-chip" data-index="${i}" aria-label="删除 ${esc(
-          s
-        )}">✕</button>
-      </span>`
-      )
-      .join('');
     const body = `
     <p class="form-sub">技能</p>
-    <div class="chip-add">
-      <input class="input" data-chip-input placeholder="输入技能后按回车，如 Figma" />
-      <button class="btn btn-sm" data-action="add-chip">添加</button>
-    </div>
-    ${chips ? `<div class="chips">${chips}</div>` : ''}
+    <div class="items">${valueRows({
+      items: skills,
+      section: 'skills',
+      emptyText: '还没有技能，点下面的按钮添加。比如「编程语言 / Python、Java」。',
+      labelText: '类别',
+      valueText: '内容',
+      labelPlaceholder: '编程语言 / 语言能力 / 设计工具',
+      valuePlaceholder: 'Python、Java / 英语 CET-6',
+    })}</div>
+    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="skills">＋ 添加技能</button>
 
     <p class="form-sub">证书 / 其他</p>
     <div class="items">${extrasItems(resume)}</div>
@@ -758,31 +769,28 @@
   /** 英文版：技能与证书（和中文版完全一样的交互） */
   function enSkillsCard(resume) {
     const en = RS.syncEnglish(resume) || {};
-    const titles = en.sectionTitles || {};
     const skills = en.skills || [];
     const extras = en.extras || [];
-    const zhSkills = (resume.skills || []).join(' / ');
-    const chips = skills
-      .map(
-        (s, i) => `
-      <span class="chip">${esc(s)}
-        <button class="chip-x" data-action="remove-chip" data-index="${i}" data-scope="en" aria-label="删除 ${esc(
-          s
-        )}">✕</button>
-      </span>`
-      )
-      .join('');
+    const zhSkills = (resume.skills || [])
+      .map((item) => [item.label, item.value].filter(Boolean).join('：'))
+      .join(' / ');
     const body = `
-    <p class="form-sub">技能 ${srcHint(zhSkills)}</p>
-    <div class="chip-add">
-      <input class="input" data-chip-input data-scope="en" placeholder="输入技能后按回车，如 Figma" />
-      <button class="btn btn-sm" data-action="add-chip" data-scope="en">添加</button>
-    </div>
-    ${chips ? `<div class="chips">${chips}</div>` : ''}
+    <p class="form-sub">Skills ${srcHint(zhSkills)}</p>
+    <div class="items">${valueRows({
+      items: skills,
+      section: 'skills',
+      scope: 'en',
+      emptyText: 'No skills yet — click the button below to add one.',
+      labelText: 'Category',
+      valueText: 'Content',
+      labelPlaceholder: 'Languages / Tools',
+      valuePlaceholder: 'Python, Java / English CET-6',
+    })}</div>
+    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="skills" data-scope="en">＋ Add skill</button>
 
-    <p class="form-sub">证书 / 其他</p>
+    <p class="form-sub">Certificates</p>
     <div class="items">${extrasItems(resume, 'en')}</div>
-    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="extras" data-scope="en">＋ 添加证书</button>`;
+    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="extras" data-scope="en">＋ Add certificate</button>`;
     return card({
       key: 'skills',
       title: '技能与证书',

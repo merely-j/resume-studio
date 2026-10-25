@@ -19,6 +19,7 @@
     normalizeFontSize,
     CUSTOM_LABELS,
     RESUME_SECTIONS,
+    normalizeSkill,
     uid,
   } = RS;
 
@@ -102,7 +103,7 @@
       experience: Array.isArray(resume.experience) ? resume.experience : [],
       projects: Array.isArray(resume.projects) ? resume.projects : [],
       education: Array.isArray(resume.education) ? resume.education : [],
-      skills: Array.isArray(resume.skills) ? resume.skills : [],
+      skills: (Array.isArray(resume.skills) ? resume.skills : []).map(normalizeSkill),
       extras: Array.isArray(resume.extras) ? resume.extras : [],
       customSections: (Array.isArray(resume.customSections) ? resume.customSections : [])
         .map(normalizeCustom)

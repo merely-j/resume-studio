@@ -168,8 +168,20 @@
       projects: { name: '', role: '', start: '', end: '', desc: '' },
       education: { school: '', degree: '', start: '', end: '', desc: '' },
       extras: { label: '', value: '' },
+      skills: { label: '', value: '' },
     };
     return Object.assign({ id: uid() }, shapes[section] || {});
+  }
+
+  /** 技能条目：老数据是纯字符串，统一成 { id, label, value } */
+  function normalizeSkill(item) {
+    if (typeof item === 'string') return { id: uid(), label: '', value: item };
+    if (!item || typeof item !== 'object') return { id: uid(), label: '', value: '' };
+    return {
+      id: item.id || uid(),
+      label: typeof item.label === 'string' ? item.label : '',
+      value: typeof item.value === 'string' ? item.value : '',
+    };
   }
 
   /** 首次打开时展示的示例简历，让用户一进来就能看到效果 */
@@ -243,7 +255,12 @@
           desc: 'GPA 3.7/4.0，校级一等奖学金；产品设计大赛华东赛区二等奖',
         },
       ],
-      skills: ['Axure / Figma', 'SQL 数据分析', 'B 端需求建模', '项目管理', '英文 CET-6'],
+      skills: [
+        { id: uid(), label: '设计工具', value: 'Axure / Figma' },
+        { id: uid(), label: '数据分析', value: 'SQL、Python' },
+        { id: uid(), label: '产品能力', value: 'B 端需求建模、项目管理' },
+        { id: uid(), label: '语言', value: '英语 CET-6' },
+      ],
       extras: [
         { id: uid(), label: '证书', value: 'PMP（2023）、信息系统项目管理师' },
         { id: uid(), label: '语言', value: '英语（读写流利，可英文会议）' },
@@ -441,7 +458,8 @@
     });
 
     en.sectionTitles = en.sectionTitles || {};
-    en.skills = Array.isArray(en.skills) ? en.skills : [];
+    // 技能和证书一样是"类别 + 内容"的条目，英文版按 id 跟上中文版的结构
+    en.skills = syncList(zh.skills, en.skills, (id) => ({ id: id, label: '', value: '' }));
     en.certs = Array.isArray(en.certs) ? en.certs : [];
     en.languages = Array.isArray(en.languages) ? en.languages : [];
     en.extras = syncList(zh.extras, en.extras, (id) => ({ id, label: '', value: '' }));
@@ -622,6 +640,7 @@
   RS.normalizeSectionOrder = normalizeSectionOrder;
   RS.emptyResume = emptyResume;
   RS.emptyItem = emptyItem;
+  RS.normalizeSkill = normalizeSkill;
   RS.sampleResume = sampleResume;
   RS.clone = clone;
   RS.toBullets = toBullets;

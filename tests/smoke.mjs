@@ -400,7 +400,11 @@ check('英文内容填全后，模块结构与中文一致', () => {
     item.degree = 'B.S. in Information Management';
     item.desc = 'GPA 3.7/4.0';
   });
-  en.skills = ['Figma', 'SQL'];
+  // 技能现在是「类别 + 内容」条目，英文版按 id 对应中文版
+  en.skills.forEach((item) => {
+    item.label = 'Tools';
+    item.value = 'Figma, SQL';
+  });
   en.extras = [{ id: 'e1', label: 'Certificate', value: 'PMP (2023)' }];
 
   const count = (html, needle) => (html.match(new RegExp(needle, 'g')) || []).length;
