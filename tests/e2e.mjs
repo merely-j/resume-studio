@@ -670,13 +670,15 @@ async function main() {
     `${beforeFit}px → ${afterFit.height}px，字号 ${afterFit.fs}px`
   );
 
-  // 压缩时照片要跟着缩，否则会出现"字很小、照片很大"
+  // 压缩时照片只轻微缩放（85%~102%），不会跟着字号一起缩成缩略图
   if (afterFit.photoCssW) {
     const mm26 = (26 * 96) / 25.4;
-    const expected = mm26 * afterFit.ratio;
+    const scale = Math.min(1.02, Math.max(0.85, afterFit.ratio));
+    const expected = mm26 * scale;
     record(
-      '压缩到一页时照片同步缩小',
-      Math.abs(afterFit.photoCssW - expected) <= Math.max(2, expected * 0.05),
+      '压缩到一页时照片只轻微缩放',
+      Math.abs(afterFit.photoCssW - expected) <= Math.max(2, expected * 0.05) &&
+        afterFit.photoCssW >= mm26 * 0.84,
       `照片 CSS 宽 ${afterFit.photoCssW.toFixed(1)}px，期望 ${expected.toFixed(1)}px（--fs=${afterFit.ratio}）`
     );
   }

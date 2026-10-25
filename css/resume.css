@@ -239,14 +239,17 @@
 /* 有照片时：左右等距内缩，保证姓名仍然居中，照片贴在右上角 */
 
 .tpl-classic .r-head--with-photo {
-  /* 照片和文字块共用同一个高度：照片多高，文字块就多高，里面的内容垂直居中，
-     这样上下留白一致，不会出现"照片比文字高出一截" */
-  --photo-h: calc(32mm * var(--fs, 1));
+  /* 照片只随压缩"轻微"缩放：最多缩到 85%，最多放大到 102%。
+     字号可以为了塞进一页缩到 55%，但照片要是跟着缩就成了缩略图。
+     文字块用同一个高度，保证两边上下边界对齐。 */
+  --photo-scale: clamp(0.85, var(--fs, 1), 1.02);
+  --photo-w: calc(26mm * var(--photo-scale));
+  --photo-h: calc(32mm * var(--photo-scale));
   display: flex;
   align-items: stretch;
   min-height: var(--photo-h);
-  /* 雅黑比原来的字体宽，留白收到 26mm，四个联系方式才能排成一行 */
-  padding: 0 calc(26mm * var(--fs, 1));
+  /* 内缩跟着照片宽度走，姓名才始终居中、也不会压到照片 */
+  padding: 0 var(--photo-w);
 }
 
 .tpl-classic .r-head--with-photo .r-head-text {
@@ -261,7 +264,7 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: calc(26mm * var(--fs, 1));
+  width: var(--photo-w);
   height: var(--photo-h);
   border-radius: 2px;
   border: 1px solid #e5e7eb;
@@ -312,8 +315,9 @@
 
 /* 双栏模板：照片放在侧栏顶部，居中且有留白 */
 .tpl-modern .r-photo--side {
-  width: calc(34mm * var(--fs, 1));
-  margin: 0 auto calc(10px * var(--fs, 1));
+  /* 同样只轻微缩放，避免压缩后照片变成缩略图 */
+  width: calc(34mm * clamp(0.85, var(--fs, 1), 1.02));
+  margin: 0 auto 10px;
   aspect-ratio: 4 / 5;
   height: auto;
   border-radius: 3px;
@@ -468,11 +472,14 @@
 
 /* 极简模板：照片靠右，黑白处理，和整体风格一致 */
 .tpl-minimal .r-head--with-photo {
-  --photo-h: calc(27mm * var(--fs, 1));
+  /* 同经典模板：照片只轻微缩放，文字块与照片等高 */
+  --photo-scale: clamp(0.85, var(--fs, 1), 1.02);
+  --photo-w: calc(22mm * var(--photo-scale));
+  --photo-h: calc(27mm * var(--photo-scale));
   display: flex;
   align-items: stretch;
   min-height: var(--photo-h);
-  padding-right: calc(30mm * var(--fs, 1));
+  padding-right: calc(var(--photo-w) + 8mm * var(--photo-scale));
 }
 
 .tpl-minimal .r-head--with-photo .r-head-text {
@@ -487,7 +494,7 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: calc(22mm * var(--fs, 1));
+  width: var(--photo-w);
   height: var(--photo-h);
   filter: grayscale(100%);
   border: 1px solid #d4d4d4;
