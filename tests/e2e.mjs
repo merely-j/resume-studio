@@ -1428,6 +1428,8 @@ async function main() {
     client,
     `(async () => {
        document.getElementById('exportDialog').close();
+       // 先确保字体就绪（线上首次要下载 2.3MB，别把下载时间算进生成超时）
+       await window.RS.pdfExport.prefetch();
        const result = await Promise.race([
          window.RS.pdfExport.toBlob(document.getElementById('paper')).then(async (blob) => {
            const buf = new Uint8Array(await blob.arrayBuffer());

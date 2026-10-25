@@ -30,10 +30,9 @@
   const ASCENT = 0.88; // 基线在行高内的位置，按 Noto Sans SC 调的
   const FONT_FILES = {
     regular: './vendor/fonts/NotoSansSC-Regular.ttf',
-    bold: './vendor/fonts/NotoSansSC-Bold.ttf',
   };
 
-  const cache = { regular: null, bold: null };
+  const cache = { regular: null };
 
   /* ---------------------------- 资源加载 ---------------------------- */
 
@@ -247,12 +246,12 @@
     });
 
     const regular = await loadFont('regular');
-    const bold = await loadFont('bold');
     stage('fonts');
     doc.addFileToVFS('NotoSansSC-Regular.ttf', regular);
     doc.addFont('NotoSansSC-Regular.ttf', 'NotoSC', 'normal');
-    doc.addFileToVFS('NotoSansSC-Bold.ttf', bold);
-    doc.addFont('NotoSansSC-Bold.ttf', 'NotoSC', 'bold');
+    // 粗体不另下 2.4MB 的粗体字体（GitHub Pages 上太慢），
+    // 用"同一段文字画两遍、错开一丝"来模拟
+    doc.addFont('NotoSansSC-Regular.ttf', 'NotoSC', 'bold');
 
     for (let i = 1; i < pageCount; i += 1) doc.addPage([PAGE_W, PAGE_H]);
 
@@ -297,10 +296,20 @@
         const y = baseline - pageIndex * PAGE_H;
         if (y < -20 || y > PAGE_H + 20) continue;
         doc.setPage(pageIndex + 1);
-        doc.setFont('NotoSC', run.bold ? 'bold' : 'normal');
+        doc.setFont('NotoSC', 'normal');
         doc.setFontSize(size);
         doc.setTextColor(run.color.r, run.color.g, run.color.b);
-        doc.text(run.text, toPt(run.x), y, { baseline: 'alphabetic' });
+        if (run.bold) {
+          // 用"描边 + 填充"模拟粗体：只画一遍，文字不会被复制成两份
+          doc.setDrawColor(run.color.r, run.color.g, run.color.b);
+          doc.setLineWidth(Math.max(0.14, size * 0.018));
+          doc.text(run.text, toPt(run.x), y, {
+            baseline: 'alphabetic',
+            renderingMode: 'fillThenStroke',
+          });
+        } else {
+          doc.text(run.text, toPt(run.x), y, { baseline: 'alphabetic' });
+        }
         if (run.underline) {
           doc.setDrawColor(run.color.r, run.color.g, run.color.b);
           doc.setLineWidth(Math.max(0.4, size * 0.05));
@@ -334,6 +343,22 @@
   /* ---------------------------- 对外接口 ---------------------------- */
 
   RS.pdfExport = {
+    /** 字体是否已经就绪（没就绪说明首次导出要先下载） */
+    isReady() {
+      return !!cache.regular;
+    },
+
+    /** 后台预取字体：用户编辑时就先下好，点导出时不用等 */
+    async prefetch() {
+      try {
+        await loadFont('regular');
+        return true;
+      } catch (err) {
+        console.warn('[pdf] 字体预取失败，导出时会重试', err);
+        return false;
+      }
+    },
+
     /** 生成 PDF 并直接触发下载 */
     async download(paper, fileName) {
       const doc = await createPdf(paper);

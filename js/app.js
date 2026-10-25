@@ -1573,6 +1573,11 @@
     }
     toast('正在生成 PDF…');
 
+    // 首次导出要先下载中文字体（2.3MB），提前告诉用户，别以为是卡住了
+    if (RS.pdfExport && !RS.pdfExport.isReady()) {
+      toast('首次导出要先下载中文字体（约 2.3MB），请稍候…');
+    }
+
     // 手机上是"编辑/预览"二选一，编辑态下纸面是隐藏的（量不到尺寸）。
     // 导出前先切到预览，导完再切回来。
     const previousView = document.body.dataset.view;
@@ -2070,6 +2075,21 @@
     setView(
       preferredView === 'preview' || preferredView === 'edit' ? preferredView : defaultView
     );
+
+    // 导出 PDF 需要内嵌中文字体（几 MB）。趁用户编辑的空档先在后台下好，
+    // 免得点「下载 PDF」时干等。下载失败也没关系，导出时会重试。
+    if (RS.pdfExport && RS.pdfExport.prefetch) {
+      const warm = () => {
+        RS.pdfExport.prefetch().catch(() => {
+          /* 忽略 */
+        });
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(warm, { timeout: 4000 });
+      } else {
+        setTimeout(warm, 2000);
+      }
+    }
 
     // PWA：只在 http(s) 下注册。
     // 沙箱 iframe / file:// 里"读取" navigator.serviceWorker 就会抛 SecurityError，
