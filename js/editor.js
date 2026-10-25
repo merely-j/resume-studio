@@ -308,7 +308,7 @@
       photoRow +
       nameRow +
       orderedGroups +
-      `<p class="form-sub">求职意向与简介</p>
+      `<p class="form-sub">求职意向</p>
       <div class="grid">
       ${field({
         label: '求职意向 / 头衔',
@@ -317,16 +317,51 @@
         placeholder: '高级产品经理 · 3 年 B 端经验',
         span: 2,
       })}
-      ${sectionTitleField(resume, 'summary', '简介模块名称（显示在简历里）')}
+      </div>
+      <p class="card-tip">以上全部为可选项。留空的字段不会出现在简历里；身份信息与联系方式可用 ↑↓ 调换上下顺序。</p>`;
+    return card({ key: 'basics', title: '基本信息', hint: '姓名 · 联系方式', body: body });
+  }
+
+  /** 个人简介单独成卡：这样它能跟着"模块顺序"一起移动 */
+  function summaryCard(resume, lang) {
+    const en = lang === 'en';
+    const zh = resume.basics || {};
+    if (en) {
+      const e = RS.syncEnglish(resume) || {};
+      const eb = e.basics || {};
+      return card({
+        key: 'summary',
+        title: '个人简介',
+        hint: 'Summary',
+        body: `<div class="grid">
+          ${field({
+            label: '模块标题（英文）',
+            bind: 'en.sectionTitles.summary',
+            value: (e.sectionTitles || {}).summary || '',
+            placeholder: RS.EN_SECTION_TITLES.summary,
+            span: 2,
+          })}
+        </div>
+        ${richField({
+          label: 'Summary',
+          bind: 'en.basics.summary',
+          value: eb.summary,
+          placeholder: 'One short paragraph: who you are, what you are good at, what you shipped.',
+          hint: srcHint(zh.summary),
+        })}`,
+      });
+    }
+    return card({
+      key: 'summary',
+      title: '个人简介',
+      body: `${sectionTitleField(resume, 'summary', '简介模块名称（显示在简历里）')}
       ${richField({
         label: '个人简介',
         bind: 'basics.summary',
-        value: b.summary,
+        value: zh.summary,
         placeholder: '三句话：你是谁、擅长什么、做出过什么结果（可加粗/斜体）',
-      })}
-      </div>
-      <p class="card-tip">以上全部为可选项。留空的字段不会出现在简历里；身份信息与联系方式可用 ↑↓ 调换上下顺序。</p>`;
-    return card({ key: 'basics', title: '基本信息', hint: '姓名 · 联系方式 · 简介', body: body });
+      })}`,
+    });
   }
 
   /**
@@ -644,13 +679,6 @@
         hint: srcHint(zh.website),
       })}
     </div>
-    ${richField({
-      label: 'Summary',
-      value: b.summary,
-      bind: 'en.basics.summary',
-      placeholder: 'Product manager with 3 years in B2B SaaS…',
-      hint: srcHint(zh.summary),
-    })}
     <p class="form-sub">个人信息（可选，留空则英文简历里不显示这一行）</p>
     <div class="grid">
       ${field({
@@ -862,24 +890,39 @@
       : `<p class="optional-hint"><span class="optional-hint-icon" aria-hidden="true">ⓘ</span>所有内容都可以不填：留空的项目不会出现在导出的 PDF 里，只写你需要的那部分就行。</p>`;
 
   function renderEditor(root, resume, lang) {
+    const en = lang === 'en';
     const customs = resume.customSections || [];
-    if (lang === 'en') {
-      root.innerHTML = [optionalHint(lang), titleCard(resume), enBasicsCard(resume)]
-        .concat(ITEM_SECTIONS.map((meta) => enListCard(resume, meta)))
-        .concat([enSkillsCard(resume)])
-        .concat(customs.map((custom) => enCustomCard(resume, custom)))
-        .join('');
-      return;
-    }
-    const html = [optionalHint(lang), titleCard(resume), basicsCard(resume)]
-      .concat(ITEM_SECTIONS.map((meta) => listCard(resume, meta)))
-      .concat([skillsCard(resume)])
-      .concat(customs.map((custom) => customCard(resume, custom)))
-      .concat([
-        `<button class="btn btn-ghost btn-block" data-action="add-custom">＋ 添加自定义模块</button>`,
-      ])
+
+    // 左侧卡片顺序 = 简历里的模块顺序：用户在顶部把模块挪到哪，这里就跟到哪
+    const cards = {};
+    normalizeSectionOrder(resume).forEach((id) => {
+      if (id === 'summary') {
+        cards[id] = summaryCard(resume, lang);
+        return;
+      }
+      if (id === 'skills') {
+        cards[id] = en ? enSkillsCard(resume) : skillsCard(resume);
+        return;
+      }
+      const custom = customs.find((c) => c.id === id);
+      if (custom) {
+        cards[id] = en ? enCustomCard(resume, custom) : customCard(resume, custom);
+        return;
+      }
+      const meta = ITEM_SECTIONS.find((m) => m.key === id);
+      if (meta) cards[id] = en ? enListCard(resume, meta) : listCard(resume, meta);
+    });
+
+    const ordered = normalizeSectionOrder(resume)
+      .map((id) => cards[id] || '')
       .join('');
-    root.innerHTML = html;
+
+    root.innerHTML =
+      optionalHint(lang) +
+      titleCard(resume) +
+      (en ? enBasicsCard(resume) : basicsCard(resume)) +
+      ordered +
+      (en ? '' : '<button class="btn btn-ghost btn-block" data-action="add-custom">＋ 添加自定义模块</button>');
   }
 
   /* ---------------------------- 事件绑定 ---------------------------- */

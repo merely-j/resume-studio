@@ -930,7 +930,9 @@
   /** 调整大模块（个人简介/工作经历/项目/教育/技能/证书）的先后 */
   function moveSection(sectionId, dir) {
     const resume = activeResume();
-    const order = normalizeSectionOrder(resume.sectionOrder);
+    // 注意：normalizeSectionOrder 收的是整个简历对象，不是顺序数组 ——
+    // 传数组会让自定义模块的 id 被判为"无效"而丢掉，表现为"新增的模块排不动/消失"
+    const order = normalizeSectionOrder(resume);
     const from = order.indexOf(sectionId);
     const to = from + dir;
     if (from === -1 || to < 0 || to >= order.length) return;

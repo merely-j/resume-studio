@@ -1108,6 +1108,68 @@ async function main() {
     `前=${orderUi.before.slice(0, 2)} 后=${orderUi.after.slice(0, 2)} 已存=${orderStored.slice(0, 2)}`
   );
 
+  // 自定义模块：能移动，且左侧卡片顺序跟着走
+  await evaluate(
+    client,
+    `(() => {
+       const addBtn = document.querySelector('#editorPane [data-action="add-custom"]');
+       if (addBtn) addBtn.click();
+       return true;
+     })()`
+  );
+  await sleep(500);
+  const customFlow = await evaluate(
+    client,
+    `(() => {
+       const state = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const active = state.resumes.find((r) => r.id === state.activeId);
+       const customId = (active.customSections || []).slice(-1)[0].id;
+       document.getElementById('btnOrder').click();
+       const rows = [...document.querySelectorAll('#orderList .order-row')];
+       const before = rows.map((r) => r.dataset.orderId);
+       rows.find((r) => r.dataset.orderId === customId).querySelector('[data-dir="-1"]').click();
+       const after = [...document.querySelectorAll('#orderList .order-row')].map((r) => r.dataset.orderId);
+       document.getElementById('orderDialog').close();
+       return { customId, before, after };
+     })()`
+  );
+  await sleep(600);
+  const syncCheck = await evaluate(
+    client,
+    `(() => {
+       // 双栏模板的侧栏在 DOM 里总是排在主栏前面，会干扰顺序比较，先切回单栏
+       const select = document.getElementById('templateSelect');
+       select.value = 'classic';
+       select.dispatchEvent(new Event('change', { bubbles: true }));
+       return true;
+     })()`
+  );
+  await sleep(500);
+  const syncState = await evaluate(
+    client,
+    `(() => {
+       const left = [...document.querySelectorAll('#editorPane .card')]
+         .map((c) => c.dataset.card)
+         .filter((k) => k !== 'basics')
+         .map((k) => (k.indexOf('custom_') === 0 ? k.slice(7) : k));
+       const paper = [...document.querySelectorAll('#paper [data-target]')].map((s) => s.dataset.target);
+       // 空模块不会渲染到纸上，所以只比对"纸上有的模块"在左侧的相对顺序
+       const leftVisible = left.filter((id) => paper.indexOf(id) !== -1);
+       return { left, paper, leftVisible };
+     })()`
+  );
+  record(
+    '自定义模块可以在顺序面板里移动',
+    customFlow.after.indexOf(customFlow.customId) !== customFlow.before.indexOf(customFlow.customId),
+    `前=${customFlow.before.slice(-2)} 后=${customFlow.after.slice(-2)}`
+  );
+  record(
+    '左侧填写顺序跟随模块顺序',
+    syncState.leftVisible.length > 0 &&
+      JSON.stringify(syncState.leftVisible) === JSON.stringify(syncState.paper),
+    `左=${syncState.leftVisible.join(',')} 纸=${syncState.paper.join(',')}`
+  );
+
   client.ws.close();
 
   for (const r of results) {
