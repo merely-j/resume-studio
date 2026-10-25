@@ -226,6 +226,31 @@ async function main() {
   record('照片被压缩成 JPEG data URL', photo.saved.indexOf('data:image/jpeg') === 0, `长度 ${photo.bytes}`);
   record('照片渲染到简历预览里', photo.inPreview);
 
+  // 4.0.1 照片和左侧文字块的上下边界要一致（否则两侧留白不齐）
+  const headerBox = await evaluate(
+    client,
+    `(() => {
+       const box = (el) => {
+         if (!el) return null;
+         const r = el.getBoundingClientRect();
+         return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height) };
+       };
+       const paper = document.getElementById('paper');
+       return {
+         text: box(paper.querySelector('.r-head-text')),
+         photo: box(paper.querySelector('.r-photo')),
+       };
+     })()`
+  );
+  record(
+    '照片与个人信息块高度一致',
+    headerBox.text &&
+      headerBox.photo &&
+      Math.abs(headerBox.text.h - headerBox.photo.h) <= 2 &&
+      Math.abs(headerBox.text.top - headerBox.photo.top) <= 2,
+    `文字=${JSON.stringify(headerBox.text)} 照片=${JSON.stringify(headerBox.photo)}`
+  );
+
   // 4.1 删除照片 → 重新上传
   await evaluate(
     client,

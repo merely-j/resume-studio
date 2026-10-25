@@ -239,11 +239,22 @@
 /* 有照片时：左右等距内缩，保证姓名仍然居中，照片贴在右上角 */
 
 .tpl-classic .r-head--with-photo {
-  /* 照片尺寸跟着字号一起缩放，这里的最小高度和内缩也要跟着变，
-     否则压缩到一页时会出现"字很小、照片很大"*/
-  min-height: calc(33mm * var(--fs, 1));
+  /* 照片和文字块共用同一个高度：照片多高，文字块就多高，里面的内容垂直居中，
+     这样上下留白一致，不会出现"照片比文字高出一截" */
+  --photo-h: calc(32mm * var(--fs, 1));
+  display: flex;
+  align-items: stretch;
+  min-height: var(--photo-h);
   /* 雅黑比原来的字体宽，留白收到 26mm，四个联系方式才能排成一行 */
-  padding: 0 calc(26mm * var(--fs, 1)) calc(9px * var(--fs, 1));
+  padding: 0 calc(26mm * var(--fs, 1));
+}
+
+.tpl-classic .r-head--with-photo .r-head-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--photo-h);
 }
 
 .tpl-classic .r-photo {
@@ -251,7 +262,7 @@
   top: 0;
   right: 0;
   width: calc(26mm * var(--fs, 1));
-  height: calc(32mm * var(--fs, 1));
+  height: var(--photo-h);
   border-radius: 2px;
   border: 1px solid #e5e7eb;
 }
@@ -457,8 +468,19 @@
 
 /* 极简模板：照片靠右，黑白处理，和整体风格一致 */
 .tpl-minimal .r-head--with-photo {
-  min-height: calc(28mm * var(--fs, 1));
+  --photo-h: calc(27mm * var(--fs, 1));
+  display: flex;
+  align-items: stretch;
+  min-height: var(--photo-h);
   padding-right: calc(30mm * var(--fs, 1));
+}
+
+.tpl-minimal .r-head--with-photo .r-head-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--photo-h);
 }
 
 .tpl-minimal .r-photo {
@@ -466,7 +488,7 @@
   top: 0;
   right: 0;
   width: calc(22mm * var(--fs, 1));
-  height: calc(27mm * var(--fs, 1));
+  height: var(--photo-h);
   filter: grayscale(100%);
   border: 1px solid #d4d4d4;
 }
