@@ -14,7 +14,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
-    <meta name="app-version" content="0.7.2" />
+    <meta name="app-version" content="0.7.3" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
@@ -255,7 +255,7 @@
         <p class="hint" id="polishStatus"></p>
       </div>
       <div class="sheet-foot polish-foot">
-        <span class="polish-cost" id="polishCost">约 0.005 元 / 次</span>
+        <span class="polish-grow"></span>
         <button class="btn btn-ghost" type="button" data-close-polish>取消</button>
         <button class="btn btn-ghost" type="button" id="btnPolishRetry">重新生成</button>
         <button class="btn btn-primary" type="button" id="btnPolishAccept" disabled>采用</button>
@@ -299,7 +299,7 @@
           <p><b>生成英文版、AI 润色都需要接一个模型服务</b></p>
           <p>用你自己的 API Key，Key 只存在这台设备上，不经过我们的服务器。</p>
           <p>这里只需要填一次：翻译和润色共用同一个 Key，不用重复配置。</p>
-          <p>没有 Key？到服务商开放平台注册一个即可 —— DeepSeek 按量计费，一份简历通常几分钱。</p>
+          <p>没有 Key？到服务商开放平台注册一个即可，具体以服务商页面为准。</p>
         </div>
         <label class="field">
           <span class="field-label">服务商</span>
@@ -334,7 +334,7 @@
               复制以 <code>sk-</code> 开头的那一串——<b>它只显示这一次</b>，先粘到记事本里
             </li>
             <li>回到这里，把它粘进上面的「API Key」输入框，点「测试连接」确认能通</li>
-            <li>如果提示余额不足：在左侧「充值」里充一点，一份简历通常只花几分钱</li>
+            <li>如果提示余额不足：在左侧「充值」里充值即可，具体价格以服务商页面为准</li>
           </ol>
           <p>
             Key 相当于账号密码，不要发给别人；万一泄漏，回到同一页面删除重建一个就好。

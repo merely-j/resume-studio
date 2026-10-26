@@ -97,7 +97,6 @@
     polishOriginal: document.getElementById('polishOriginal'),
     polishResult: document.getElementById('polishResult'),
     polishStatus: document.getElementById('polishStatus'),
-    polishCost: document.getElementById('polishCost'),
     btnPolishAccept: document.getElementById('btnPolishAccept'),
     btnPolishRetry: document.getElementById('btnPolishRetry'),
     btnOrder: document.getElementById('btnOrder'),
@@ -1670,10 +1669,6 @@
     el.polishStatus.textContent = '';
     el.btnPolishAccept.disabled = true;
     choosePolishStyle('concise');
-    if (el.polishCost) {
-      const cost = (text.length * 0.000012).toFixed(3);
-      el.polishCost.textContent = '约 ' + (cost === '0.000' ? '0.005' : cost.replace(/0+$/, '')) + ' 元 / 次';
-    }
     el.polishDialog.showModal();
     runPolish();
   }
