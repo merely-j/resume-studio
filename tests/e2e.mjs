@@ -12,7 +12,7 @@
  *   APP_URL=file:///D:/ds_workspace/resume-app/index.html node tests/e2e.mjs
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const DEBUG_PORT = process.env.CDP_PORT || 9333;
 const APP_URL = process.env.APP_URL || 'https://merely-j.github.io/resume-studio/';
@@ -1421,13 +1421,13 @@ async function main() {
     // 回归：PDF 内容流顺序 ≠ 视觉顺序时，姓名仍要在最上面
     const orderedPdf = new URL('./fixtures/resume-out-of-order.pdf', import.meta.url).pathname.replace(/^\//, '');
     if (existsSync(orderedPdf)) {
+      const orderBuf = readFileSync(orderedPdf);
       const orderCheck = await evaluate(
         client,
         `(async () => {
-           const res = await fetch('./tests/fixtures/resume-out-of-order.pdf');
-           if (!res.ok) return { skip: true };
-           const buf = await res.arrayBuffer();
-           const r = await window.RS.pdfImport.parse(buf);
+           const b64 = ${JSON.stringify(orderBuf.toString('base64'))};
+           const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+           const r = await window.RS.pdfImport.parse(bytes.buffer);
            return {
              name: r.resume.basics.name,
              firstLine: r.lines[0],
