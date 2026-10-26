@@ -607,6 +607,25 @@ body {
   min-height: 88px;
 }
 
+/* 技能 / 证书的"内容"：单独一行、可拖动高度，长内容能看全 */
+.input-area {
+  width: 100%;
+  min-height: 66px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.65;
+  font-family: inherit;
+}
+
+/* 清除 API Key：低调但能看出是危险操作 */
+.btn-clear-key {
+  color: var(--danger);
+}
+
+.btn-clear-key:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
 /* 富文本框：工具栏 + 可编辑区（只做行内格式，不引入富文本库） */
 
 .rich {

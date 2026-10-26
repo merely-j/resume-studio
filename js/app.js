@@ -91,6 +91,7 @@
     testResult: document.getElementById('testResult'),
     translateIntro: document.getElementById('translateIntro'),
     btnTranslateSave: document.getElementById('btnTranslateSave'),
+    btnClearApiKey: document.getElementById('btnClearApiKey'),
     polishDialog: document.getElementById('polishDialog'),
     polishStyles: document.getElementById('polishStyles'),
     polishOriginal: document.getElementById('polishOriginal'),
@@ -2105,6 +2106,22 @@
         el.settingsDialog.close();
       });
     });
+
+    // 清除 Key：不再用 AI 时把凭据从本机抹掉，避免 Token 被别人拿走
+    if (el.btnClearApiKey) {
+      el.btnClearApiKey.addEventListener('click', async () => {
+        if (!(await askConfirm('清除后，翻译和 AI 润色都会停用，需要重新填写 Key 才能再用。确定清除？', '清除'))) {
+          return;
+        }
+        translateSettings = Object.assign({}, translateSettings, { apiKey: '', introSeen: true });
+        saveTranslateSettings(translateSettings);
+        if (el.apiKeyInput) el.apiKeyInput.value = '';
+        if (el.testResult) el.testResult.textContent = '已清除';
+        syncLangUi(activeResume());
+        toast('API Key 已清除');
+        el.settingsDialog.close();
+      });
+    }
 
     /* ---------- 模块顺序 ---------- */
     if (el.btnOrder) el.btnOrder.addEventListener('click', openOrderDialog);

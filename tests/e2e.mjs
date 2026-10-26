@@ -1571,6 +1571,63 @@ async function main() {
     );
   }
 
+  // 技能 / 证书的"内容"是多行框，长内容能看全
+  const valueBoxes = await evaluate(
+    client,
+    `(() => {
+       const card = document.querySelector('[data-card="skills"]');
+       const areas = card ? card.querySelectorAll('textarea[data-field="value"]') : [];
+       return {
+         count: areas.length,
+         rows: areas[0] ? Number(areas[0].rows) : 0,
+         tall: areas[0] ? areas[0].getBoundingClientRect().height > 50 : false,
+       };
+     })()`
+  );
+  record(
+    '技能 / 证书的内容用多行框展示',
+    valueBoxes.count >= 2 && valueBoxes.rows >= 2 && valueBoxes.tall,
+    JSON.stringify(valueBoxes)
+  );
+
+  // 清除 API Key：点了之后本机不再保存 Key
+  const cleared = await evaluate(
+    client,
+    `(() => {
+       document.getElementById('btnTranslateSettings').click();
+       document.getElementById('apiKeyInput').value = 'sk-test-to-clear';
+       document.getElementById('btnTranslateSave').click();
+       return JSON.parse(localStorage.getItem('resume-app.translate.v1')).apiKey;
+     })()`
+  );
+  await sleep(300);
+  await evaluate(client, `document.getElementById('btnTranslateSettings').click()`);
+  await sleep(300);
+  await evaluate(client, `document.getElementById('btnClearApiKey').click()`);
+  await sleep(400);
+  const clearConfirmOpen = await evaluate(client, `document.getElementById('confirmDialog').open`);
+  await evaluate(client, `document.getElementById('btnConfirmOk').click()`);
+  await sleep(500);
+  const afterClear = await evaluate(
+    client,
+    `(() => {
+       const saved = JSON.parse(localStorage.getItem('resume-app.translate.v1') || '{}');
+       return {
+         key: saved.apiKey || '',
+         input: document.getElementById('apiKeyInput').value,
+         notice: (document.getElementById('btnBatchTranslate') || {}).textContent || '',
+       };
+     })()`
+  );
+  record(
+    '可以清除已保存的 API Key',
+    cleared === 'sk-test-to-clear' &&
+      clearConfirmOpen === true &&
+      afterClear.key === '' &&
+      afterClear.input === '',
+    JSON.stringify({ before: cleared, after: afterClear.key, confirmOpen: clearConfirmOpen })
+  );
+
   client.ws.close();
 
   for (const r of results) {

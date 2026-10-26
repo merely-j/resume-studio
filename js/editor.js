@@ -50,6 +50,19 @@
     </label>`;
   }
 
+  /** 多行输入：技能 / 证书的"内容"这类可能很长，单行框看不全 */
+  function textareaField(opts) {
+    const o = opts;
+    const dataAttrs = `data-section="${o.section}" data-id="${o.id}" data-field="${o.name}"`;
+    const scope = o.scope ? ` data-scope="${o.scope}"` : '';
+    return `
+    <label class="field" data-span="2">
+      <span class="field-label">${esc(o.label)}</span>
+      <textarea class="input input-area" rows="${o.rows || 3}"
+                placeholder="${esc(o.placeholder || '')}"${scope} ${dataAttrs}>${esc(o.value)}</textarea>
+    </label>`;
+  }
+
   /** 英文模式下字段旁的小字中文原文（超长由 CSS 省略） */
   function srcHint(text) {
     const plain = String(text == null ? '' : text)
@@ -475,7 +488,8 @@
             placeholder: o.labelPlaceholder || '',
             scope: o.scope,
           }),
-          field({
+          // 内容单独占一整行，长内容也能看全
+          textareaField({
             label: o.valueText || (en ? 'Content' : '内容'),
             value: item.value,
             section: o.section,
@@ -483,6 +497,7 @@
             name: 'value',
             placeholder: o.valuePlaceholder || '',
             scope: o.scope,
+            rows: o.valueRows || 3,
           }),
         ].join('');
         // 技能只有固定一行，不给排序/删除按钮（删了就没法再编辑）
