@@ -7,7 +7,7 @@
  * 改完代码要让用户看到更新，把 CACHE 名字加个版本号即可（必要时引导刷新）。
  */
 
-const CACHE = 'resume-app-v0.7.0';
+const CACHE = 'resume-app-v0.7.1';
 
 const ASSETS = [
   './',

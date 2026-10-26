@@ -20,6 +20,7 @@
     CUSTOM_LABELS,
     RESUME_SECTIONS,
     mergeSkills,
+    normalizeEducation,
     uid,
   } = RS;
 
@@ -102,7 +103,9 @@
       basics: basics,
       experience: Array.isArray(resume.experience) ? resume.experience : [],
       projects: Array.isArray(resume.projects) ? resume.projects : [],
-      education: Array.isArray(resume.education) ? resume.education : [],
+      education: (Array.isArray(resume.education) ? resume.education : []).map((item) =>
+        Object.assign({ id: (item && item.id) || uid() }, item, normalizeEducation(item))
+      ),
       skills: mergeSkills(resume.skills),
       extras: Array.isArray(resume.extras) ? resume.extras : [],
       customSections: (Array.isArray(resume.customSections) ? resume.customSections : [])

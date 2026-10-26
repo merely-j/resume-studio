@@ -162,12 +162,39 @@
     };
   }
 
+  /**
+   * 教育经历：专业和学历分两个字段。
+   * 老数据把「专业 · 学历」写在一起，这里拆开（认不出就原样保留在学历里）。
+   */
+  function normalizeEducation(item) {
+    const safe = item || {};
+    const major = typeof safe.major === 'string' ? safe.major.trim() : '';
+    const degree = typeof safe.degree === 'string' ? safe.degree.trim() : '';
+    if (major || !degree) return { major: major, degree: degree };
+
+    const parts = degree
+      .split(/\s*[·|｜]\s*|\s+[-–—]\s+|\s*[，,]\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length < 2) return { major: '', degree: degree };
+
+    const degreeRe =
+      /^(本科|硕士|博士|大专|专科|学士|研究生|MBA|EMBA|B\.?S\.?|M\.?S\.?|Ph\.?D\.?|Bachelor|Master|Doctor)$/i;
+    const degreePart = parts.find((p) => degreeRe.test(p)) || '';
+    if (!degreePart) return { major: '', degree: degree };
+
+    return {
+      major: parts.filter((p) => p !== degreePart).join(' · '),
+      degree: degreePart,
+    };
+  }
+
   /** 新建一条经历类空记录 */
   function emptyItem(section) {
     const shapes = {
       experience: { company: '', role: '', start: '', end: '', desc: '' },
       projects: { name: '', role: '', start: '', end: '', desc: '' },
-      education: { school: '', degree: '', start: '', end: '', desc: '' },
+      education: { school: '', major: '', degree: '', start: '', end: '', desc: '' },
       extras: { label: '', value: '' },
       skills: { label: '', value: '' },
     };
@@ -269,7 +296,8 @@
         {
           id: uid(),
           school: '浙江大学',
-          degree: '信息管理与信息系统 · 本科',
+          major: '信息管理与信息系统',
+          degree: '本科',
           start: '2016.09',
           end: '2020.06',
           desc: 'GPA 3.7/4.0，校级一等奖学金；产品设计大赛华东赛区二等奖',
@@ -663,6 +691,7 @@
   RS.emptyResume = emptyResume;
   RS.emptyItem = emptyItem;
   RS.normalizeSkill = normalizeSkill;
+  RS.normalizeEducation = normalizeEducation;
   RS.mergeSkills = mergeSkills;
   RS.sampleResume = sampleResume;
   RS.clone = clone;

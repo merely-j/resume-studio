@@ -339,6 +339,31 @@ check('JSON 导出后能原样导入', () => {
   assert.equal(restored.experience[0].company, sample.experience[0].company);
 });
 
+check('教育经历：专业和学历分开存，老数据自动拆开', () => {
+  const resume = sampleResume();
+  const normalized = RS.normalizeResume(resume);
+  const edu = normalized.education[0];
+  assert.equal(edu.school, '浙江大学');
+  assert.equal(edu.major, '信息管理与信息系统');
+  assert.equal(edu.degree, '本科');
+
+  // 老数据：专业和学历写在一个字段里
+  const legacy = sampleResume();
+  legacy.education[0].major = '';
+  legacy.education[0].degree = '计算机科学与技术 · 硕士';
+  const fixed = RS.normalizeResume(legacy).education[0];
+  assert.equal(fixed.major, '计算机科学与技术');
+  assert.equal(fixed.degree, '硕士');
+
+  // 只有一个词时原样保留
+  const single = sampleResume();
+  single.education[0].major = '';
+  single.education[0].degree = '本科';
+  const kept = RS.normalizeResume(single).education[0];
+  assert.equal(kept.degree, '本科');
+  assert.equal(kept.major, '');
+});
+
 check('历史版本：能存、能去重、有上限、能删', () => {
   RS.clearSnapshots();
   const resume = sampleResume();

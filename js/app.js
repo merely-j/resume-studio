@@ -381,6 +381,7 @@
     resume.education = (data.education || []).map((item) => ({
       id: RS.uid(),
       school: item.school || '',
+      major: item.major || '',
       degree: item.degree || '',
       start: item.start || '',
       end: item.end || '',

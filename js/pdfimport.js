@@ -674,10 +674,28 @@
         const headNoDate = entry.head.replace(DATE_RANGE, ' ').replace(/\s+/g, ' ').trim();
         const parts = headNoDate.split(/\s*[|｜]\s*|\s+[-–—]\s+/).map((s) => s.trim()).filter(Boolean);
         const school = parts[0] || info.title;
-        const degreeParts = parts.slice(1).filter((p) => !/^\d{4}/.test(p));
+        const rest = parts.slice(1).filter((p) => !/^\d{4}/.test(p));
+
+        // 专业和学历分开：认出"本科/硕士/博士…"那一段当学历，其余是专业
+        const degreeRe =
+          /^(本科|硕士|博士|大专|专科|学士|研究生|MBA|EMBA|B\.?S\.?|M\.?S\.?|Ph\.?D\.?|Bachelor|Master|Doctor)$/i;
+        let degree = '';
+        const majors = [];
+        rest.forEach((part) => {
+          part
+            .split(/\s*[·，,]\s*/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .forEach((piece) => {
+              if (!degree && degreeRe.test(piece)) degree = piece;
+              else majors.push(piece);
+            });
+        });
+
         resume.education.push({
           school: school,
-          degree: degreeParts.join(' · ') || info.sub || '',
+          major: majors.join(' · ') || info.sub || '',
+          degree: degree,
           start: info.start,
           end: info.end,
           desc: extraLines.map((l) => l.text).join('<br>'),

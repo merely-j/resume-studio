@@ -177,7 +177,8 @@
       labelOf: (item) => item.school,
       fields: [
         { name: 'school', label: '学校', placeholder: '浙江大学' },
-        { name: 'degree', label: '学历 / 专业', placeholder: '信息管理与信息系统 · 本科' },
+        { name: 'major', label: '专业', placeholder: '信息管理与信息系统' },
+        { name: 'degree', label: '学历 / 学位', placeholder: '本科' },
         { name: 'start', label: '开始时间', placeholder: '2016.09' },
         { name: 'end', label: '结束时间', placeholder: '2020.06' },
         {

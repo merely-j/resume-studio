@@ -219,13 +219,15 @@
   function educationHtml(resume) {
     const rows = (resume.education || [])
       .filter((item) => has(item.school))
-      .map(
-        (item) => `
+      .map((item) => {
+        // 专业和学历分开填，这里用 · 连起来显示在副标题里
+        const subtitle = [item.major, item.degree].filter(has).join(' · ');
+        return `
       <article class="r-entry">
-        ${entryHead(item.school, item.degree, item.start, item.end)}
+        ${entryHead(item.school, subtitle, item.start, item.end)}
         ${bullets(item.desc)}
-      </article>`
-      )
+      </article>`;
+      })
       .join('');
     return section(sectionTitle(resume, 'education'), rows ? `<div class="r-entries">${rows}</div>` : '');
   }
