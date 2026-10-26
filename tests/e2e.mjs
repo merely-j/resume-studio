@@ -1112,6 +1112,84 @@ async function main() {
   // 还原被替换的 fetch，避免影响后面的导出（导出要下载字体）
   await evaluate(client, `(() => { if (window.__realFetch) window.fetch = window.__realFetch; return true; })()`);
 
+  // 9.1.5 AI 润色：点 ✨ → 对比面板 → 采用写回
+  // 先切回中文（英文版没有 ✨），并确保有 Key
+  await evaluate(
+    client,
+    `(() => {
+       const zh = document.getElementById('btnLangZh');
+       if (zh) zh.click();
+       return true;
+     })()`
+  );
+  await sleep(500);
+  const polishSetup = await evaluate(
+    client,
+    `(() => {
+       document.getElementById('btnTranslateSettings').click();
+       document.getElementById('baseUrlInput').value = 'https://api.deepseek.com/v1';
+       document.getElementById('modelInput').value = 'deepseek-chat';
+       document.getElementById('apiKeyInput').value = 'sk-test';
+       document.getElementById('btnTranslateSave').click();
+
+       const btn = document.querySelector('[data-card="summary"] [data-action="polish"]');
+       if (!btn) return { ok: false, reason: '没有 ✨ 按钮' };
+       window.__realFetch = window.__realFetch || window.fetch;
+       window.fetch = async () => ({
+         ok: true,
+         status: 200,
+         json: async () => ({ choices: [{ message: { content: 'AI 润色后的简介文本' } }] }),
+         text: async () => '',
+       });
+       btn.click();
+       return { ok: true };
+     })()`
+  );
+  await sleep(900);
+  const polishDialog = await evaluate(
+    client,
+    `(() => ({
+       open: document.getElementById('polishDialog').open,
+       original: document.getElementById('polishOriginal').textContent.trim().length,
+       result: document.getElementById('polishResult').value.trim(),
+       canAccept: !document.getElementById('btnPolishAccept').disabled,
+       styles: document.querySelectorAll('#polishStyles .polish-style').length,
+     }))()`
+  );
+  record(
+    '大段文字有 AI 润色入口，弹窗给出原文和结果',
+    polishSetup.ok &&
+      polishDialog.open &&
+      polishDialog.original > 0 &&
+      polishDialog.result.length > 0 &&
+      polishDialog.canAccept &&
+      polishDialog.styles === 3,
+    JSON.stringify(polishDialog)
+  );
+
+  await evaluate(client, `document.getElementById('btnPolishAccept').click()`);
+  await sleep(600);
+  const polished = await evaluate(
+    client,
+    `(() => {
+       if (window.__realFetch) window.fetch = window.__realFetch;
+       const s = JSON.parse(localStorage.getItem('resume-app.v1'));
+       const a = s.resumes.find((r) => r.id === s.activeId);
+       return {
+         field: (document.querySelector('[data-bind="basics.summary"]') || {}).innerText || '',
+         saved: a.basics.summary || '',
+         closed: !document.getElementById('polishDialog').open,
+       };
+     })()`
+  );
+  record(
+    '采用润色结果后写回内容',
+    polished.field.indexOf('AI 润色后的简介文本') !== -1 &&
+      polished.saved.indexOf('AI 润色后的简介文本') !== -1 &&
+      polished.closed,
+    `字段="${polished.field.slice(0, 20)}"`
+  );
+
   // 9.2 导出弹窗：中文 / 英文两个选项
   const exportUi = await evaluate(
     client,

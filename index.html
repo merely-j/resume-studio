@@ -14,7 +14,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
-    <meta name="app-version" content="0.6.5" />
+    <meta name="app-version" content="0.7.0" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
@@ -90,7 +90,7 @@
             <button type="button" id="btnLangZh" data-lang="zh" aria-pressed="true">中文</button>
             <button type="button" id="btnLangEn" data-lang="en" aria-pressed="false">English</button>
           </div>
-          <button class="btn btn-sm btn-ghost" id="btnTranslateSettings" type="button">🌐 翻译设置</button>
+          <button class="btn btn-sm btn-ghost" id="btnTranslateSettings" type="button">🔑 AI 设置</button>
           <button class="btn btn-sm btn-ghost" id="btnOrder" type="button" title="调整各模块的先后顺序">↕ 模块顺序</button>
         </div>
         <div class="toolbar-selects">
@@ -230,6 +230,38 @@
       </div>
     </dialog>
 
+    <!-- AI 润色：只作用于大段文字，采用前先对比 -->
+    <dialog class="sheet sheet--polish" id="polishDialog" aria-label="AI 润色">
+      <div class="sheet-head">
+        <h2>AI 润色</h2>
+        <button class="icon-btn" type="button" data-close-polish aria-label="关闭">✕</button>
+      </div>
+      <div class="sheet-body">
+        <div class="polish-styles" id="polishStyles">
+          <button class="polish-style is-active" type="button" data-style="concise">精简</button>
+          <button class="polish-style" type="button" data-style="impact">突出结果</button>
+          <button class="polish-style" type="button" data-style="professional">更专业</button>
+        </div>
+        <div class="polish-cols">
+          <div>
+            <p class="form-sub">原文</p>
+            <pre class="polish-box" id="polishOriginal"></pre>
+          </div>
+          <div>
+            <p class="form-sub">润色后（可直接改）</p>
+            <textarea class="polish-box" id="polishResult" spellcheck="false"></textarea>
+          </div>
+        </div>
+        <p class="hint" id="polishStatus"></p>
+      </div>
+      <div class="sheet-foot polish-foot">
+        <span class="polish-cost" id="polishCost">约 0.005 元 / 次</span>
+        <button class="btn btn-ghost" type="button" data-close-polish>取消</button>
+        <button class="btn btn-ghost" type="button" id="btnPolishRetry">重新生成</button>
+        <button class="btn btn-primary" type="button" id="btnPolishAccept" disabled>采用</button>
+      </div>
+    </dialog>
+
     <!-- 站内确认框：沙箱/内嵌环境里 window.confirm 会被浏览器直接忽略，必须自己实现 -->
     <dialog class="sheet sheet--confirm" id="confirmDialog" aria-label="确认操作">
       <div class="sheet-body">
@@ -256,16 +288,17 @@
       </div>
     </dialog>
 
-    <!-- 翻译设置：用户自己的 API Key，只存本机 -->
+    <!-- AI 设置：翻译 / 润色共用的 API Key，只存本机 -->
     <dialog class="sheet" id="translateDialog" aria-label="翻译设置">
       <div class="sheet-head">
-        <h2>翻译设置</h2>
+        <h2>AI 设置</h2>
         <button class="icon-btn" type="button" data-close-translate aria-label="关闭">✕</button>
       </div>
       <div class="sheet-body">
         <div class="translate-intro" id="translateIntro" hidden>
-          <p><b>生成英文版需要接一个翻译服务</b></p>
-          <p>用你自己的 API Key，翻译质量最好；Key 只存在这台设备上，不经过我们的服务器。</p>
+          <p><b>生成英文版、AI 润色都需要接一个模型服务</b></p>
+          <p>用你自己的 API Key，Key 只存在这台设备上，不经过我们的服务器。</p>
+          <p>这里只需要填一次：翻译和润色共用同一个 Key，不用重复配置。</p>
           <p>没有 Key？到服务商开放平台注册一个即可 —— DeepSeek 按量计费，一份简历通常几分钱。</p>
         </div>
         <label class="field">

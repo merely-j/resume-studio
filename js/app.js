@@ -91,6 +91,14 @@
     testResult: document.getElementById('testResult'),
     translateIntro: document.getElementById('translateIntro'),
     btnTranslateSave: document.getElementById('btnTranslateSave'),
+    polishDialog: document.getElementById('polishDialog'),
+    polishStyles: document.getElementById('polishStyles'),
+    polishOriginal: document.getElementById('polishOriginal'),
+    polishResult: document.getElementById('polishResult'),
+    polishStatus: document.getElementById('polishStatus'),
+    polishCost: document.getElementById('polishCost'),
+    btnPolishAccept: document.getElementById('btnPolishAccept'),
+    btnPolishRetry: document.getElementById('btnPolishRetry'),
     btnOrder: document.getElementById('btnOrder'),
     orderDialog: document.getElementById('orderDialog'),
     orderList: document.getElementById('orderList'),
@@ -1563,6 +1571,129 @@
       .join('');
   }
 
+  /* ---------------------------- AI 润色 ---------------------------- */
+
+  const POLISH_STYLES = {
+    concise: '精简：删掉空话和重复表达，句子更短，信息密度更高',
+    impact: '突出结果：把量化结果放到每条要点开头，让人一眼看到成果',
+    professional: '更专业：用词更书面、更像行业里的表述，避免口语',
+  };
+
+  let polishContext = null; // { el, text, style }
+
+  /** 编辑器回调用到的处理函数（init 里赋值，供 AI 润色等模块级函数复用） */
+  let handlers = null;
+
+  /** 润色提示词：硬性禁止编造事实 */
+  function buildPolishPrompt(text, style) {
+    return [
+      '你是一位中文简历编辑，请润色下面这段简历内容。',
+      '硬性规则：',
+      '1. 只优化表达，不得新增或编造任何事实（公司、时间、数字、成果）',
+      '2. 原文里的数字和指标必须原样保留，不许改数值',
+      '3. 保留"一行一条"的结构，不要把多条要点合并成一段',
+      '4. 不要加小标题、不要加总结句、不要加解释',
+      '5. 避免"赋能、闭环、抓手、打法、组合拳"这类空话',
+      '6. 只输出润色后的正文，不要加引号、不要加代码块',
+      '',
+      '风格：' + (POLISH_STYLES[style] || POLISH_STYLES.concise),
+      '',
+      '原文：',
+      text,
+    ].join('\n');
+  }
+
+  function choosePolishStyle(style) {
+    if (!polishContext) return;
+    polishContext.style = style;
+    el.polishStyles.querySelectorAll('.polish-style').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.style === style);
+    });
+  }
+
+  async function runPolish() {
+    if (!polishContext) return;
+    const text = el.polishResult.value.trim() || polishContext.text;
+
+    el.polishStatus.textContent = '正在润色…';
+    el.btnPolishAccept.disabled = true;
+    el.btnPolishRetry.disabled = true;
+
+    try {
+      const content = await callChat(
+        [
+          { role: 'system', content: '你是中文简历编辑，只输出润色后的正文。' },
+          { role: 'user', content: buildPolishPrompt(polishContext.text, polishContext.style) },
+        ],
+        { temperature: 0.4 }
+      );
+      const cleaned = String(content || '')
+        .replace(/^```[a-z]*\s*/i, '')
+        .replace(/```$/, '')
+        .replace(/^["“](.*)["”]$/s, '$1')
+        .trim();
+      if (!cleaned) throw new Error('模型返回了空内容');
+      el.polishResult.value = cleaned;
+      el.polishStatus.textContent = '';
+      el.btnPolishAccept.disabled = false;
+    } catch (err) {
+      console.error('[润色]', err);
+      el.polishStatus.textContent = '润色失败：' + (err && err.message ? err.message : '未知错误');
+    } finally {
+      el.btnPolishRetry.disabled = false;
+    }
+    return text;
+  }
+
+  /** 点工具栏的 ✨：先看有没有写内容、有没有配 Key */
+  function openPolish(richEl) {
+    const text = String(richEl.innerText || richEl.textContent || '').trim();
+    if (!text) {
+      toast('先写点内容，再来润色');
+      return;
+    }
+    if (!hasApiConfig()) {
+      openTranslateSettings({ intro: true });
+      toast('配置一次 API Key，翻译和润色都能用');
+      return;
+    }
+    if (text.length > 2000) {
+      toast('这段太长了（' + text.length + ' 字），先拆成几段再润色');
+      return;
+    }
+
+    polishContext = { el: richEl, text: text, style: 'concise' };
+    el.polishOriginal.textContent = text;
+    el.polishResult.value = '';
+    el.polishStatus.textContent = '';
+    el.btnPolishAccept.disabled = true;
+    choosePolishStyle('concise');
+    if (el.polishCost) {
+      const cost = (text.length * 0.000012).toFixed(3);
+      el.polishCost.textContent = '约 ' + (cost === '0.000' ? '0.005' : cost.replace(/0+$/, '')) + ' 元 / 次';
+    }
+    el.polishDialog.showModal();
+    runPolish();
+  }
+
+  /** 采用润色结果：写回模型 + 更新界面，可撤销 */
+  function acceptPolish() {
+    if (!polishContext) return;
+    const value = el.polishResult.value.trim();
+    if (!value) return;
+    const html = escHtml(value).replace(/\n/g, '<br>');
+    const target = polishContext.el;
+    const { bind, section, id, field, scope } = target.dataset;
+
+    if (bind) handlers.setPath(bind, html);
+    else handlers.setField(section, id, field, html, scope);
+
+    target.innerHTML = html;
+    el.polishDialog.close();
+    polishContext = null;
+    toast('已采用润色结果（Ctrl+Z 可撤销）');
+  }
+
   /* ---------------------------- 导出 PDF ---------------------------- */
 
   function safeName(text) {
@@ -1816,7 +1947,7 @@
       }
     });
 
-    bindEditor(el.editor, {
+    handlers = {
       setPath: withHistory(setPath),
       setField: withHistory(setField),
       addItem: withHistory(addItem),
@@ -1835,8 +1966,11 @@
       setListLines: withHistory(setListLines),
       setExtrasLines: withHistory(setExtrasLines),
       translateItem: translateItem,
+      openPolish: openPolish,
       refreshEditor: paintEditor,
-    });
+    };
+
+    bindEditor(el.editor, handlers);
 
     if (el.btnFit) el.btnFit.addEventListener('click', withHistory(toggleFitOnePage));
     if (el.btnUndo) el.btnUndo.addEventListener('click', undo);
@@ -2009,6 +2143,31 @@
       el.importDialog.addEventListener('cancel', (event) => {
         event.preventDefault();
         el.importDialog.close();
+      });
+    }
+
+    /* ---------- AI 润色 ---------- */
+    if (el.polishStyles) {
+      el.polishStyles.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-style]');
+        if (!btn) return;
+        choosePolishStyle(btn.dataset.style);
+        runPolish();
+      });
+    }
+    if (el.btnPolishRetry) el.btnPolishRetry.addEventListener('click', runPolish);
+    if (el.btnPolishAccept) el.btnPolishAccept.addEventListener('click', acceptPolish);
+    document.querySelectorAll('[data-close-polish]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        polishContext = null;
+        el.polishDialog.close();
+      });
+    });
+    if (el.polishDialog) {
+      el.polishDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        polishContext = null;
+        el.polishDialog.close();
       });
     }
 

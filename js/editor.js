@@ -74,6 +74,13 @@
       ? `data-bind="${o.bind}"`
       : `data-section="${o.section}" data-id="${o.id}" data-field="${o.name}"`;
     const scope = o.scope ? ` data-scope="${o.scope}"` : '';
+    // 英文版不提供 AI 润色（提示词是给中文简历写的）
+    const polish =
+      o.scope === 'en'
+        ? ''
+        : `<span class="rich-grow"></span>
+          <button type="button" class="rich-btn rich-ai" data-action="polish"
+                  title="AI 润色这段文字" aria-label="AI 润色">✨</button>`;
     return `
     <div class="field" data-span="2">
       <span class="field-label">${esc(o.label)}${o.hint || ''}</span>
@@ -82,6 +89,7 @@
           <button type="button" class="rich-btn" data-cmd="bold" title="加粗" aria-label="加粗"><b>B</b></button>
           <button type="button" class="rich-btn" data-cmd="italic" title="斜体" aria-label="斜体"><i>I</i></button>
           <button type="button" class="rich-btn" data-cmd="underline" title="下划线" aria-label="下划线"><u>U</u></button>
+          ${polish}
         </div>
         <div class="rich-input" contenteditable="true" role="textbox" aria-multiline="true"
              data-rich ${dataAttrs}${scope}
@@ -1006,6 +1014,17 @@
       },
       true
     );
+
+    // AI 润色：点 ✨ 把这一段交给主控处理（弹对比面板）
+    root.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-action="polish"]');
+      if (!btn) return;
+      event.preventDefault();
+      const wrap = btn.closest('[data-rich-wrap]');
+      const field = wrap && wrap.querySelector('[data-rich]');
+      if (!field) return;
+      if (handlers.openPolish) handlers.openPolish(field);
+    });
 
     // 格式按钮：用 mousedown 保住选区，否则点按钮时编辑区会失焦
     root.addEventListener('mousedown', (event) => {
