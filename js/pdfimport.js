@@ -154,12 +154,21 @@
         const y = Math.round(item.transform[5]);
         const x = Math.round(item.transform[4]);
         const size = Math.round(Math.hypot(item.transform[2], item.transform[3]) * 10) / 10;
+        const right = x + (item.width || 0);
 
         if (current && Math.abs(current.y - y) <= 3) {
           current.spans.push({ x, str: item.str, size });
           current.text += item.str;
+          current.right = Math.max(current.right, right);
         } else {
-          current = { y, x, size, text: item.str, spans: [{ x, str: item.str, size }] };
+          current = {
+            y,
+            x,
+            right,
+            size,
+            text: item.str,
+            spans: [{ x, str: item.str, size }],
+          };
           pageLines.push(current);
         }
       });
@@ -167,17 +176,123 @@
       pageLines.forEach((line) => {
         const text = normalizeText(line.text).replace(/\s+/g, ' ').trim();
         if (!text) return;
-        lines.push({ text, x: line.x, y: line.y, size: line.size, page: p });
+        lines.push({
+          text,
+          x: line.x,
+          right: line.right,
+          y: line.y,
+          size: line.size,
+          page: p,
+        });
       });
       pages.push({ page: p, width: page.view[2], height: page.view[3] });
     }
 
-    return { lines, pages, numPages: doc.numPages };
+    // 关键：PDF 内容流顺序 ≠ 视觉顺序。有些生成器先画正文、最后才画姓名，
+    // 不按坐标重排就会出现"名字跑到最下面""工作经历变成姓名"。
+    const ordered = orderByLayout(lines, pages, doc.numPages);
+    return { lines: ordered, pages, numPages: doc.numPages };
+  }
+
+  /* ---------------------------- 阅读顺序 ---------------------------- */
+
+  /** 按页处理：先找栏，再从上到下、从左到右 */
+  function orderByLayout(lines, pages, numPages) {
+    const sizeOf = {};
+    pages.forEach((p) => {
+      sizeOf[p.page] = { width: p.width || 595, height: p.height || 842 };
+    });
+
+    const out = [];
+    for (let page = 1; page <= numPages; page += 1) {
+      const pageLines = lines.filter((l) => l.page === page);
+      if (!pageLines.length) continue;
+      const info = sizeOf[page] || { width: 595, height: 842 };
+      out.push(...orderPage(pageLines, info, 0));
+    }
+    return out;
+  }
+
+  function orderPage(lines, pageInfo, depth) {
+    if (lines.length <= 1 || depth > 2) return sortTopDown(lines);
+
+    const split = findColumnSplit(lines, pageInfo);
+    if (!split) return sortTopDown(lines);
+
+    const left = lines.filter((l) => (l.right || l.x) <= split.end + 1);
+    const right = lines.filter((l) => l.x >= split.end - 1);
+    const rest = lines.filter(
+      (l) => !((l.right || l.x) <= split.end + 1) && !(l.x >= split.end - 1)
+    );
+
+    return [
+      ...orderPage(left, pageInfo, depth + 1),
+      ...orderPage(rest, pageInfo, depth + 1),
+      ...orderPage(right, pageInfo, depth + 1),
+    ];
+  }
+
+  function sortTopDown(lines) {
+    // y 越大越靠上；同一行内按 x 从左到右
+    return lines.slice().sort((a, b) => b.y - a.y || a.x - b.x);
+  }
+
+  /**
+   * 找出一段"没有任何文字跨越"的竖向空白带，把页面分成左右两栏。
+   * 只认足够宽、两侧都够多、且右侧纵向覆盖也够大的空隙，
+   * 否则单栏简历里右对齐的日期会被误判成第二栏。
+   */
+  function findColumnSplit(lines, pageInfo) {
+    const width = pageInfo.width || 595;
+    const sorted = lines.slice().sort((a, b) => a.x - b.x);
+    let maxRight = -Infinity;
+    let best = null;
+
+    sorted.forEach((line) => {
+      const right = line.right || line.x;
+      if (maxRight !== -Infinity) {
+        const gap = line.x - maxRight;
+        if (gap > width * 0.06) {
+          const leftCount = sorted.filter((l) => (l.right || l.x) <= maxRight + 1).length;
+          const rightCount = sorted.filter((l) => l.x >= line.x - 1).length;
+          const total = sorted.length;
+          if (
+            leftCount >= 3 &&
+            rightCount >= 3 &&
+            leftCount / total >= 0.15 &&
+            rightCount / total >= 0.15
+          ) {
+            const rightSpan = verticalSpan(sorted.filter((l) => l.x >= line.x - 1));
+            const allSpan = verticalSpan(sorted) || 1;
+            if (!best || gap > best.gap) {
+              best = {
+                start: maxRight,
+                end: line.x,
+                gap,
+                ratio: rightSpan / allSpan,
+              };
+            }
+          }
+        }
+      }
+      maxRight = Math.max(maxRight, right);
+    });
+
+    if (best && best.ratio >= 0.35) return { start: best.start, end: best.end };
+    return null;
+  }
+
+  function verticalSpan(lines) {
+    if (!lines.length) return 0;
+    const top = Math.max(...lines.map((l) => l.y));
+    const bottom = Math.min(...lines.map((l) => l.y));
+    return Math.max(0, top - bottom);
   }
 
   /** 视觉上连续的两行合并成一段（同字号、同缩进、上一行没以句号结尾） */
   function mergeParagraphs(lines) {
     const out = [];
+    if (!lines.length) return out;
     const bodySize = median(lines.map((l) => l.size)) || 10;
 
     // 左边距出现最多的那个 x，就是正文的左边界；
@@ -252,9 +367,10 @@
   const BRAND_WORDS = /^(Google|Adobe|Microsoft|Amazon|Meta|Apple|Data|Machine|Deep|Auto|New|Sales|Table|Power)/i;
 
   function splitSkillTags(text) {
-    const tokens = splitTokens(text);
+    // 分隔符本身（/ · 、 |）不是技能，丢掉，否则会拼出 "A / / / B"
+    const tokens = splitTokens(text).filter((t) => !/^[\/·、|,，;；-]+$/.test(t));
     const merged = [];
-    tokens.forEach((token, i) => {
+    tokens.forEach((token) => {
       const prev = merged[merged.length - 1];
       if (prev && BRAND_WORDS.test(prev) && /^[A-Za-z]/.test(token)) {
         merged[merged.length - 1] = prev + ' ' + token;
@@ -365,13 +481,24 @@
       customSections: [],
     };
 
-    // 1. 姓名：最上面、字号最大的短行
+    // 1. 姓名：重排之后，取"顶部若干行里字号最大的短行"，
+    //    并排除模块标题（否则顺序一乱就会把「工作经历」当成姓名）
+    const HEADING_WORDS =
+      /^(个人简介|自我评价|个人总结|个人优势|简介|工作经历|工作经验|职业经历|实习经历|项目经历|项目经验|教育背景|教育经历|学历背景|技能|技能与特长|专业技能|技术技能|资格证书|证书|认证|语言|语言能力|荣誉|获奖|其它|其他|联系方式|个人信息)/;
     let cursor = 0;
+    const topLines = lines.slice(0, 8);
+    const namePool = topLines.filter(
+      (l) =>
+        l.text.length <= 24 &&
+        !/@|\d{3,}|\//.test(l.text) &&
+        !HEADING_WORDS.test(l.text.replace(/[：:]\s*$/, ''))
+    );
+    const maxSize = Math.max(...lines.map((l) => l.size), 0);
     const nameCandidate =
-      lines
-        .slice(0, 5)
-        .filter((l) => l.text.length <= 24 && !/@|\d{3,}|\//.test(l.text))
-        .sort((a, b) => b.size - a.size)[0] || null;
+      namePool.filter((l) => l.size >= maxSize - 0.6).sort((a, b) => b.size - a.size)[0] ||
+      namePool.sort((a, b) => b.size - a.size)[0] ||
+      topLines[0] ||
+      null;
     if (nameCandidate) {
       resume.basics.name = nameCandidate.text;
       cursor = lines.indexOf(nameCandidate) + 1;
@@ -617,6 +744,9 @@
     /** 完整流程：ArrayBuffer → { resume, warnings, lines, numPages } */
     async parse(buffer) {
       const { lines, numPages } = await extractLines(buffer);
+      if (!lines.length) {
+        throw new Error('这份 PDF 提取不到文字（可能是扫描件，或字体没有嵌入），暂时无法导入');
+      }
       const result = buildResume(lines);
       const allText = lines.map((l) => l.text).join('\n');
       if (hasBrokenGlyphs(allText)) {

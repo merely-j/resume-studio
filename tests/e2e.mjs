@@ -1417,6 +1417,30 @@ async function main() {
       imported.resumes >= 2 && imported.name.length > 0 && imported.exp > 0 && imported.paperHasName && imported.closed,
       JSON.stringify(imported)
     );
+
+    // 回归：PDF 内容流顺序 ≠ 视觉顺序时，姓名仍要在最上面
+    const orderedPdf = new URL('./fixtures/resume-out-of-order.pdf', import.meta.url).pathname.replace(/^\//, '');
+    if (existsSync(orderedPdf)) {
+      const orderCheck = await evaluate(
+        client,
+        `(async () => {
+           const res = await fetch('./tests/fixtures/resume-out-of-order.pdf');
+           if (!res.ok) return { skip: true };
+           const buf = await res.arrayBuffer();
+           const r = await window.RS.pdfImport.parse(buf);
+           return {
+             name: r.resume.basics.name,
+             firstLine: r.lines[0],
+             exp: r.resume.experience.length,
+           };
+         })()`
+      );
+      record(
+        'PDF 绘制顺序乱掉时，姓名仍在最上面',
+        orderCheck && orderCheck.name === '张小明' && orderCheck.firstLine === '张小明' && orderCheck.exp > 0,
+        JSON.stringify(orderCheck)
+      );
+    }
   } else {
     console.log('（跳过 PDF 导入测试：本机没有示例 PDF）');
   }
