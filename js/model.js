@@ -156,7 +156,8 @@
       experience: [],
       projects: [],
       education: [],
-      skills: [],
+      // 技能始终保留一行（类别默认「技能」），没有内容时预览不渲染
+      skills: [{ id: uid(), label: '技能', value: '' }],
       extras: [],
     };
   }
@@ -182,6 +183,25 @@
       label: typeof item.label === 'string' ? item.label : '',
       value: typeof item.value === 'string' ? item.value : '',
     };
+  }
+
+  /**
+   * 技能是"一整行"：类别（默认「技能」）+ 内容（多个技能用 / 分隔）。
+   * 老数据可能是多条，这里合并成一条，避免预览里一个技能占一行。
+   */
+  function mergeSkills(list) {
+    const items = (Array.isArray(list) ? list : [])
+      .map(normalizeSkill)
+      .filter((s) => s.value.trim() || s.label.trim());
+    if (!items.length) return [{ id: uid(), label: '技能', value: '' }];
+    if (items.length === 1) {
+      return [{ id: items[0].id, label: items[0].label || '技能', value: items[0].value }];
+    }
+    const value = items
+      .map((s) => s.value.trim())
+      .filter(Boolean)
+      .join(' / ');
+    return [{ id: items[0].id, label: '技能', value: value }];
   }
 
   /** 首次打开时展示的示例简历，让用户一进来就能看到效果 */
@@ -255,11 +275,13 @@
           desc: 'GPA 3.7/4.0，校级一等奖学金；产品设计大赛华东赛区二等奖',
         },
       ],
+      // 技能是"一整行"：类别 + 用 / 分隔的内容
       skills: [
-        { id: uid(), label: '设计工具', value: 'Axure / Figma' },
-        { id: uid(), label: '数据分析', value: 'SQL、Python' },
-        { id: uid(), label: '产品能力', value: 'B 端需求建模、项目管理' },
-        { id: uid(), label: '语言', value: '英语 CET-6' },
+        {
+          id: uid(),
+          label: '技能',
+          value: 'Axure / Figma / SQL 数据分析 / B 端需求建模 / 项目管理 / 英语 CET-6',
+        },
       ],
       extras: [
         { id: uid(), label: '证书', value: 'PMP（2023）、信息系统项目管理师' },
@@ -641,6 +663,7 @@
   RS.emptyResume = emptyResume;
   RS.emptyItem = emptyItem;
   RS.normalizeSkill = normalizeSkill;
+  RS.mergeSkills = mergeSkills;
   RS.sampleResume = sampleResume;
   RS.clone = clone;
   RS.toBullets = toBullets;

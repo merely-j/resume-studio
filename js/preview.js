@@ -230,26 +230,36 @@
     return section(sectionTitle(resume, 'education'), rows ? `<div class="r-entries">${rows}</div>` : '');
   }
 
-  /** 技能与证书：同一个模块里，上一段技能、下一段证书 */
+  /** 技能与证书：技能是"一整行"（技能 A / B / C），证书是逐条 */
   function skillsCertsHtml(resume) {
-    const skills = (resume.skills || []).filter(
-      (item) => has(item && item.label) || has(item && item.value)
-    );
+    // 技能只按内容判断：类别默认叫「技能」，内容为空时整块不显示
+    const skills = (resume.skills || []).filter((item) => has(item && item.value));
     const certs = (resume.extras || []).filter((item) => has(item.label) || has(item.value));
     if (!skills.length && !certs.length) return '';
 
-    // 技能和证书用同一套"类别 + 内容"排版
-    const rowsOf = (items) =>
-      `<ul class="r-extras">${items
-        .map(
-          (item) =>
-            `<li>${
-              has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
-            }${esc(item.value)}</li>`
-        )
-        .join('')}</ul>`;
+    const skillsPart = skills.length
+      ? `<ul class="r-extras">${skills
+          .map(
+            (item) =>
+              `<li><span class="r-extra-label">${esc(item.label || '技能')}</span>${esc(
+                item.value
+              )}</li>`
+          )
+          .join('')}</ul>`
+      : '';
 
-    return section(sectionTitle(resume, 'skills'), rowsOf(skills) + rowsOf(certs));
+    const certsPart = certs.length
+      ? `<ul class="r-extras">${certs
+          .map(
+            (item) =>
+              `<li>${
+                has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
+              }${esc(item.value)}</li>`
+          )
+          .join('')}</ul>`
+      : '';
+
+    return section(sectionTitle(resume, 'skills'), skillsPart + certsPart);
   }
 
   /** 自定义模块：字段名由用户自己定，结构和工作经历一致 */
@@ -361,9 +371,7 @@
       : '';
 
     const skillsBlock = (function () {
-      const skills = (resume.skills || []).filter(
-        (item) => has(item && item.label) || has(item && item.value)
-      );
+      const skills = (resume.skills || []).filter((item) => has(item && item.value));
       const certs = (resume.extras || []).filter((item) => has(item.label) || has(item.value));
       if (!skills.length && !certs.length) return '';
       return `<div class="r-side-block" data-target="skills" data-label="${esc(
@@ -374,9 +382,9 @@
             ? `<ul class="r-side-list r-side-list--plain">${skills
                 .map(
                   (item) =>
-                    `<li>${
-                      has(item.label) ? `<span class="r-extra-label">${esc(item.label)}</span>` : ''
-                    }${esc(item.value)}</li>`
+                    `<li><span class="r-extra-label">${esc(
+                      item.label || '技能'
+                    )}</span>${esc(item.value)}</li>`
                 )
                 .join('')}</ul>`
             : ''

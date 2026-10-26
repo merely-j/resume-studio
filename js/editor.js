@@ -476,18 +476,22 @@
             scope: o.scope,
           }),
         ].join('');
-        return `
-        <div class="item" data-item="${item.id}">
-          <div class="item-bar">
-            <span class="item-title">${esc(item.label || item.value || '新条目')}</span>
-            <span class="item-tools">
+        // 技能只有固定一行，不给排序/删除按钮（删了就没法再编辑）
+        const tools = o.noTools
+          ? ''
+          : `<span class="item-tools">
               <button class="icon-btn" data-action="move-item" data-section="${o.section}" data-id="${item.id}" data-dir="-1"${scopeAttr}
                       title="上移" aria-label="上移">↑</button>
               <button class="icon-btn" data-action="move-item" data-section="${o.section}" data-id="${item.id}" data-dir="1"${scopeAttr}
                       title="下移" aria-label="下移">↓</button>
               <button class="icon-btn icon-btn--danger" data-action="remove-item" data-section="${o.section}" data-id="${item.id}"${scopeAttr}
                       title="删除" aria-label="删除">✕</button>
-            </span>
+            </span>`;
+        return `
+        <div class="item" data-item="${item.id}">
+          <div class="item-bar">
+            <span class="item-title">${esc(item.label || item.value || '新条目')}</span>
+            ${tools}
           </div>
           <div class="grid">${body}</div>
         </div>`;
@@ -516,17 +520,17 @@
     const skills = resume.skills || [];
     const extras = resume.extras || [];
     const body = `
-    <p class="form-sub">技能</p>
+    <p class="form-sub">技能（多个用 / 分隔，整块显示成一行）</p>
     <div class="items">${valueRows({
       items: skills,
       section: 'skills',
-      emptyText: '还没有技能，点下面的按钮添加。比如「编程语言 / Python、Java」。',
+      noTools: true,
+      emptyText: '还没有技能。',
       labelText: '类别',
       valueText: '内容',
-      labelPlaceholder: '编程语言 / 语言能力 / 设计工具',
-      valuePlaceholder: 'Python、Java / 英语 CET-6',
+      labelPlaceholder: '技能',
+      valuePlaceholder: 'Axure / Figma / SQL / 英语 CET-6',
     })}</div>
-    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="skills">＋ 添加技能</button>
 
     <p class="form-sub">证书 / 其他</p>
     <div class="items">${extrasItems(resume)}</div>
@@ -535,7 +539,8 @@
       key: 'skills',
       title: '技能与证书',
       edit: { id: 'skills' },
-      count: skills.length + extras.length || undefined,
+      count:
+        (skills.filter((s) => String(s.value || '').trim()).length ? 1 : 0) + extras.length || undefined,
       body: body,
     });
   }
@@ -772,7 +777,8 @@
     const skills = en.skills || [];
     const extras = en.extras || [];
     const zhSkills = (resume.skills || [])
-      .map((item) => [item.label, item.value].filter(Boolean).join('：'))
+      .filter((item) => String(item.value || '').trim())
+      .map((item) => [item.label, item.value].filter(Boolean).join(' '))
       .join(' / ');
     const body = `
     <p class="form-sub">Skills ${srcHint(zhSkills)}</p>
@@ -780,13 +786,13 @@
       items: skills,
       section: 'skills',
       scope: 'en',
-      emptyText: 'No skills yet — click the button below to add one.',
+      noTools: true,
+      emptyText: 'No skills yet.',
       labelText: 'Category',
       valueText: 'Content',
-      labelPlaceholder: 'Languages / Tools',
-      valuePlaceholder: 'Python, Java / English CET-6',
+      labelPlaceholder: 'Skills',
+      valuePlaceholder: 'Figma / SQL / English CET-6',
     })}</div>
-    <button class="btn btn-ghost btn-block" data-action="add-item" data-section="skills" data-scope="en">＋ Add skill</button>
 
     <p class="form-sub">Certificates</p>
     <div class="items">${extrasItems(resume, 'en')}</div>
@@ -795,7 +801,8 @@
       key: 'skills',
       title: '技能与证书',
       edit: { id: 'skills', lang: 'en' },
-      count: skills.length + extras.length || undefined,
+      count:
+        (skills.filter((s) => String(s.value || '').trim()).length ? 1 : 0) + extras.length || undefined,
       body: body,
     });
   }

@@ -489,6 +489,8 @@
       bucket.raw = (bucket.raw ? bucket.raw + ' ' : '') + text;
     });
 
+    // 技能最后合并成"一整行"：技能 A / B / C
+    const tokens = [];
     buckets.forEach((bucket) => {
       const isLang = /语言/.test(bucket.label);
       if (isLang) {
@@ -496,12 +498,13 @@
         resume.extras.push({ label: '语言', value: (bucket.raw || bucket.items.join(' · ')).trim() });
         return;
       }
-      const label = bucket.label || '';
       bucket.items.forEach((item) => {
-        const exists = resume.skills.some((s) => s.label === label && s.value === item);
-        if (!exists) resume.skills.push({ label: label, value: item });
+        if (tokens.indexOf(item) === -1) tokens.push(item);
       });
     });
+    if (tokens.length) {
+      resume.skills = [{ label: '技能', value: tokens.join(' / ') }];
+    }
   }
 
   /** 经历 / 项目 / 教育段：按"带日期范围的行"切条目 */

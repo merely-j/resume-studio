@@ -172,45 +172,37 @@ async function main() {
   );
   record('新增后自动聚焦到新条目', focusedNew);
 
-  // 3. 添加技能：和证书一样是「类别 + 内容」两栏，自己填
-  await evaluate(
-    client,
-    `(() => {
-       const btn = document.querySelector('[data-action="add-item"][data-section="skills"]');
-       if (btn) btn.click();
-       return true;
-     })()`
-  );
-  await sleep(300);
+  // 3. 技能是"一整行"：填一个内容框，预览里用 / 连起来显示
   const skillTyped = await evaluate(
     client,
     `(() => {
        const card = document.querySelector('[data-card="skills"]');
-       const items = card ? card.querySelectorAll('.item') : [];
-       const last = items[items.length - 1];
-       if (!last) return { ok: false };
-       const label = last.querySelector('[data-field="label"]');
-       const value = last.querySelector('[data-field="value"]');
-       label.value = '编程语言';
-       label.dispatchEvent(new Event('input', { bubbles: true }));
-       value.value = 'TypeScript';
+       const rows = card ? card.querySelectorAll('[data-section="skills"][data-field="value"]') : [];
+       if (!rows.length) return { ok: false, rows: 0 };
+       const value = rows[0];
+       value.value = 'TypeScript / Python';
        value.dispatchEvent(new Event('input', { bubbles: true }));
-       return { ok: true, count: items.length };
+       return { ok: true, rows: rows.length };
      })()`
   );
   await waitFrames(client);
-  const chip = await evaluate(
+  const skillView = await evaluate(
     client,
-    `({
-       count: document.querySelectorAll('[data-card="skills"] .item').length,
-       preview: document.querySelector('#paper').textContent.includes('TypeScript'),
-       hasLabel: document.querySelector('#paper').textContent.includes('编程语言'),
-     })`
+    `(() => {
+       const paper = document.querySelector('#paper');
+       const items = paper.querySelectorAll('.r-extras li');
+       const first = items[0] ? items[0].textContent : '';
+       return {
+         rows: items.length,
+         hasLabel: first.indexOf('技能') !== -1,
+         hasValue: first.indexOf('TypeScript / Python') !== -1,
+       };
+     })()`
   );
   record(
-    '技能可以自己填「类别 + 内容」',
-    skillTyped.ok && chip.count > 0 && chip.preview && chip.hasLabel,
-    `条目=${chip.count} 内容=${chip.preview} 类别=${chip.hasLabel}`
+    '技能合并成一行显示（加粗「技能」+ 内容）',
+    skillTyped.ok && skillTyped.rows === 1 && skillView.hasLabel && skillView.hasValue,
+    `编辑行数=${skillTyped.rows} 首行="${skillView.hasLabel ? '技能 ' : ''}${skillView.hasValue ? '内容' : ''}"`
   );
 
   // 4. 上传照片（用调试协议把文件塞进隐藏的 file input，等价于用户点选文件）

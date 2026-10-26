@@ -323,7 +323,7 @@
       row('工作经历', r.experience.length ? r.experience.length + ' 条' : ''),
       row('项目经历', r.projects.length ? r.projects.length + ' 条' : ''),
       row('教育经历', r.education.length ? r.education.length + ' 条' : ''),
-      row('技能', r.skills.length ? r.skills.length + ' 项' : ''),
+      row('技能', (r.skills || []).some((s) => String(s.value || '').trim()) ? '1 行' : ''),
       row('证书 / 其他', r.extras.length ? r.extras.length + ' 条' : ''),
     ].join('');
 
@@ -378,10 +378,13 @@
       end: item.end || '',
       desc: item.desc || '',
     }));
-    resume.skills = (data.skills || []).map((item) =>
-      typeof item === 'string'
-        ? { id: RS.uid(), label: '', value: item }
-        : { id: RS.uid(), label: item.label || '', value: item.value || '' }
+    // 技能合并成"一整行"（类别 + 用 / 分隔的内容）
+    resume.skills = RS.mergeSkills(
+      (data.skills || []).map((item) =>
+        typeof item === 'string'
+          ? { label: '', value: item }
+          : { label: item.label || '', value: item.value || '' }
+      )
     );
     resume.extras = (data.extras || []).map((item) => ({
       id: RS.uid(),
